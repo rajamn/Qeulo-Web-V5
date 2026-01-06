@@ -1,0 +1,10 @@
+{% extends "base_sidebar.html" %}
+{% block content %}
+<div class="container py-4">
+  <h3 class="text-primary mb-3">Hospital Settings</h3>
+  <p>Hospital: {{ hospital.hospital_name }}</p>
+  <p>Phone: {{ hospital.phone_num }}</p>
+  <p>Email: {{ hospital.email }}</p>
+  <p>Address: {{ hospital.street }}, {{ hospital.city }}, {{ hospital.state }} – {{ hospital.pincode }}</p>
+</div>
+{% endblock %}

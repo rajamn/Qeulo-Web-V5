@@ -1,0 +1,98 @@
+{% extends "base_sidebar.html" %}
+{% load static %}
+
+{% block content %}
+<div class="container py-4">
+  <div class="d-flex justify-content-between align-items-center mb-3">
+    <h3 class="text-primary mb-0">
+      <i class="bi bi-people"></i> Manage Doctors
+    </h3>
+    <a href="{% url 'hospital_admin:hospital_settings' %}" class="btn btn-outline-secondary btn-sm">
+      <i class="bi bi-gear"></i> Hospital Settings
+    </a>
+  </div>
+
+  <div class="card shadow-sm border-0">
+    <div class="card-body">
+      {% if doctors %}
+        <div class="table-responsive">
+          <table class="table table-hover align-middle">
+            <thead class="table-light">
+              <tr>
+                <th>#</th>
+                <th>Doctor Name</th>
+                <th>Mobile</th>
+                <th>Fees (₹)</th>
+                <th>Avg. Time (mins)</th>
+                <th>Start Time</th>
+                <th>Status</th>
+                <th class="text-center">Actions</th>
+              </tr>
+            </thead>
+            <tbody>
+              {% for doctor in doctors %}
+                <tr class="{% if not doctor.is_active %}table-danger{% endif %}">
+                  <td>{{ forloop.counter }}</td>
+                  <td>{{ doctor.doctor_name }}</td>
+                  <td>{{ doctor.doc_mobile_num }}</td>
+                  <td>{{ doctor.fees }}</td>
+                  <td>{{ doctor.average_time_minutes }}</td>
+                  <td>{{ doctor.start_time|time:"H:i" }}</td>
+                  <td>
+                    {% if doctor.is_active %}
+                      <span class="badge bg-success">Active</span>
+                    {% else %}
+                      <span class="badge bg-danger">Inactive</span>
+                    {% endif %}
+                  </td>
+                  <td class="text-center">
+                    <div class="btn-group">
+                      <a href="{% url 'hospital_admin:doctor_edit' doctor.id %}" 
+                         class="btn btn-sm btn-outline-primary">
+                        <i class="bi bi-pencil-square"></i> Edit
+                      </a>
+                      {% if doctor.is_active %}
+                        <button type="button" 
+                                class="btn btn-sm btn-outline-danger"
+                                onclick="confirmDeactivate('{{ doctor.id }}', '{{ doctor.doctor_name }}')">
+                          <i class="bi bi-person-dash"></i> Deactivate
+                        </button>
+                      {% else %}
+                        <button type="button" 
+                                class="btn btn-sm btn-outline-success"
+                                onclick="confirmActivate('{{ doctor.id }}', '{{ doctor.doctor_name }}')">
+                          <i class="bi bi-person-check"></i> Activate
+                        </button>
+                      {% endif %}
+                    </div>
+                  </td>
+                </tr>
+              {% endfor %}
+            </tbody>
+          </table>
+        </div>
+      {% else %}
+        <p class="text-muted text-center my-4">
+          <i class="bi bi-info-circle"></i> No doctors found for this hospital.
+        </p>
+      {% endif %}
+    </div>
+  </div>
+</div>
+{% endblock %}
+
+{% block extra_scripts %}
+<script>
+  // Confirm before activating/deactivating
+  function confirmDeactivate(id, name) {
+    if (confirm(`Are you sure you want to deactivate Dr. ${name}?`)) {
+      window.location.href = `/hospital-admin/doctors/${id}/deactivate/`;
+    }
+  }
+  function confirmActivate(id, name) {
+    if (confirm(`Are you sure you want to activate Dr. ${name}?`)) {
+      window.location.href = `/hospital-admin/doctors/${id}/activate/`;
+    }
+  }
+</script>
+{% endblock %}

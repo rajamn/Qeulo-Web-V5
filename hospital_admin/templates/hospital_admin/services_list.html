@@ -1,0 +1,56 @@
+{% extends "base_sidebar.html" %}
+{% block title %}Services{% endblock %}
+{% block content %}
+<div class="container py-4">
+  <div class="d-flex justify-content-between align-items-center mb-3">
+    <h3 class="text-primary mb-0"><i class="bi bi-gear"></i> Services</h3>
+    <a href="{% url 'hospital_admin:service_add' %}" class="btn btn-success">
+      <i class="bi bi-plus-circle"></i> Add Service
+    </a>
+  </div>
+
+  {% if messages %}
+    {% for message in messages %}
+      <div class="alert alert-{{ message.tags }} alert-dismissible fade show" role="alert">
+        {{ message }}
+        <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
+      </div>
+    {% endfor %}
+  {% endif %}
+
+  <div class="card shadow-sm">
+    <div class="table-responsive">
+      <table class="table table-striped align-middle mb-0">
+        <thead class="table-light">
+          <tr>
+            <th scope="col">#</th>
+            <th scope="col">Service Name</th>
+            <th scope="col" class="text-end">Fees (₹)</th>
+            <th scope="col" class="text-end">Actions</th>
+          </tr>
+        </thead>
+        <tbody>
+          {% for s in services %}
+            <tr>
+              <td>{{ forloop.counter }}</td>
+              <td>{{ s.service_name }}</td>
+              <td class="text-end">{{ s.service_fees }}</td>
+              <td class="text-end">
+                <a href="{% url 'hospital_admin:service_edit' s.id %}" class="btn btn-sm btn-outline-primary">
+                  <i class="bi bi-pencil-square"></i> Edit
+                </a>
+              </td>
+            </tr>
+          {% empty %}
+            <tr>
+              <td colspan="4" class="text-center text-muted py-3">
+                No services found for this hospital.
+              </td>
+            </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+  </div>
+</div>
+{% endblock %}

@@ -1,0 +1,232 @@
+{% extends 'base.html' %}
+{% load core_filters %}
+
+{% block title %}
+  Patient Self-Registration - {{ hospital.hospital_name }}
+{% endblock %}
+
+{% block content %}
+<div class="container mt-4" style="max-width: 900px;">
+  <!-- 🏥 Hospital Header -->
+  <div class="text-center mb-4">
+    <h2 class="text-primary">{{ hospital.hospital_name }}</h2>
+    <p class="text-muted">Patient Self Check-In</p>
+  </div>
+
+  {% if messages %}
+    {% for message in messages %}
+      <div class="alert alert-{{ message.tags }} alert-dismissible fade show text-center" role="alert">
+        {{ message }}
+        <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
+      </div>
+    {% endfor %}
+  {% endif %}
+
+  <!-- 💳 Registration Form -->
+  <form method="post" class="card p-4 shadow-sm bg-white border-0 rounded-3">
+    {% csrf_token %}
+    <input type="hidden" name="payment-paid_on" id="id_payment-paid_on">
+
+    <div class="row">
+      <!-- Left: Contact + Demographics -->
+      <div class="col-md-6">
+        <h5 class="text-secondary mb-3">Patient Info</h5>
+
+        <div class="mb-3">
+          {{ patient_form.mobile_num.label_tag }}
+          {{ patient_form.mobile_num|add_attr:"class=form-control autocomplete=off placeholder='Enter mobile number' autofocus" }}
+        </div>
+
+        <div class="mb-3">
+          {{ patient_form.contact_name.label_tag }}
+          {{ patient_form.contact_name|add_attr:"class=form-control id=contact_name placeholder='Enter contact name'" }}
+        </div>
+
+        <div class="mb-3 d-flex align-items-end gap-3">
+          <div class="flex-grow-1">
+            {{ patient_form.patient_name.label_tag }}
+            {{ patient_form.patient_name|add_attr:"class=form-control id=patient_name placeholder='Enter patient name'" }}
+          </div>
+          <div class="form-check mb-2">
+            <input class="form-check-input" type="checkbox" id="same_as_contact">
+            <label class="form-check-label" for="same_as_contact">Same?</label>
+          </div>
+        </div>
+
+        <div class="mb-3">
+          {{ patient_form.dob.label_tag }}
+          {{ patient_form.dob|add_attr:"class=form-control type=date placeholder='Select date of birth'" }}
+          <small class="text-muted" id="age_display_text"></small>
+        </div>
+
+        <div class="mb-3">
+          {{ patient_form.gender.label_tag }}
+          {{ patient_form.gender|add_attr:"class=form-select" }}
+        </div>
+
+        <div class="mb-3">
+          {{ patient_form.referred_by.label_tag }}
+          {{ patient_form.referred_by|add_attr:"class=form-control placeholder='Optional'" }}
+        </div>
+      </div>
+
+      <!-- Right: Doctor + Billing -->
+      <div class="col-md-6">
+        <h5 class="text-secondary mb-3">Appointment & Billing</h5>
+
+        <div class="mb-3">
+          {{ appointment_form.doctor.label_tag }}
+          {{ appointment_form.doctor|add_attr:"class=form-select" }}
+        </div>
+
+        <div class="mb-3">
+          {{ appointment_form.appointment_on.label_tag }}
+          {{ appointment_form.appointment_on|add_attr:"class=form-control" }}
+        </div>
+
+        <h6 class="text-secondary mt-4">Billing Details</h6>
+        <div class="row border rounded p-3 mb-3 bg-light shadow-sm">
+          <div class="col-md-4">
+            {{ transaction_form.service.label_tag }}
+            {{ transaction_form.service|add_attr:"class=form-select" }}
+          </div>
+          <div class="col-md-4">
+            {{ transaction_form.pay_type.label_tag }}
+            {{ transaction_form.pay_type|add_attr:"class=form-select" }}
+          </div>
+          <div class="col-md-4">
+            {{ transaction_form.amount.label_tag }}
+            {{ transaction_form.amount|add_attr:"class=form-control amount-field" }}
+          </div>
+        </div>
+        <!-- 💰 Live ETA  -->
+        <div class="mt-4 border rounded p-3 bg-light shadow-sm">
+          <div class="row text-center">
+            <div class="col-md-6">
+              <h6 class="text-secondary mb-1">Estimated Time</h6>
+              <div id="eta-display" class="fs-6 text-primary fw-bold">—</div>
+            </div>
+          </div>
+        </div>
+
+        <div class="text-center mt-4">
+          <button type="submit" name="submit" class="btn btn-primary px-5 py-2">
+            Register
+          </button>
+        </div>
+      </div>
+    </div>
+  </form>
+
+  <!-- 🔁 ETA Display -->
+  {% if eta %}
+    <div class="alert alert-info mt-3 text-center">
+      <strong>Estimated Time of Appointment (ETA):</strong>
+      {{ eta|time:"H:i" }}
+      {% if que_pos %}
+        <span class="text-muted ms-2">(Queue Position: {{ que_pos }})</span>
+      {% endif %}
+      <!-- 🕒 ETA placeholder (for JS updates) -->
+      <div id="eta-display" class="alert alert-info mt-3 text-center d-none"></div>
+    </div>
+  {% endif %}
+</div>
+
+<!-- ✅ Script -->
+<script>
+document.addEventListener("DOMContentLoaded", function () {
+  // ========== Same-Name Logic ==========
+  const contactInput = document.getElementById("contact_name");
+  const patientInput = document.getElementById("patient_name");
+  const checkbox = document.getElementById("same_as_contact");
+  const apptDate = document.getElementById("id_appointment-appointment_on");
+  const payDate  = document.getElementById("id_payment-paid_on");
+
+  function copyIfChecked() {
+    if (checkbox.checked) {
+      patientInput.value = contactInput.value || "";
+    }
+  }
+
+  if (checkbox && contactInput && patientInput) {
+    checkbox.addEventListener("change", () => {
+      copyIfChecked();
+      patientInput.readOnly = checkbox.checked;
+    });
+    contactInput.addEventListener("input", copyIfChecked);
+  }
+
+  // ========== Total Amount (manual entry fields) ==========
+  const totalDisplay = document.getElementById("total_amount_display");
+  if (totalDisplay) {
+    document.querySelectorAll(".amount-field").forEach(input => {
+      input.addEventListener("input", () => {
+        let total = 0;
+        document.querySelectorAll(".amount-field").forEach(i => {
+          const val = parseFloat(i.value);
+          if (!isNaN(val)) total += val;
+        });
+        totalDisplay.textContent = "₹ " + total.toFixed(2);
+      });
+    });
+  }
+
+  // ========== ETA fetch when doctor selected ==========
+  const doctorSelect = document.getElementById("id_appointment-doctor");
+  const etaDisplay = document.getElementById("eta-display");
+
+  if (!doctorSelect || !etaDisplay) return;
+
+  doctorSelect.addEventListener("change", async function () {
+    const doctorId = this.value;
+    if (!doctorId) {
+      etaDisplay.textContent = "—";
+      return;
+    }
+
+    const pathParts = window.location.pathname.split('/');
+    const slug = pathParts[2];
+    const apiUrl = `/h/${slug}/api/doctor_info/${doctorId}/`;
+
+    console.log("➡️ Fetching ETA from:", apiUrl);
+
+    try {
+      const response = await fetch(apiUrl);
+      console.log("Response status:", response.status);
+      if (!response.ok) throw new Error("Network error");
+      const data = await response.json();
+
+      etaDisplay.textContent = data.eta
+        ? `${data.eta} (${data.queued} patient${data.queued !== 1 ? "s" : ""} ahead)`
+        : "—";
+    } catch (err) {
+      console.error("Doctor info API failed:", err);
+      etaDisplay.textContent = "—";
+    }
+  });
+});
+// ========== Auto Age Calculation from DOB ==========
+const dobInput = document.getElementById("id_patient-dob");
+const ageText = document.getElementById("age_display_text");
+
+if (dobInput && ageText) {
+  dobInput.addEventListener("change", () => {
+    const dob = new Date(dobInput.value);
+    if (isNaN(dob)) {
+      ageText.textContent = "";
+      return;
+    }
+    const today = new Date();
+    let years = today.getFullYear() - dob.getFullYear();
+    let months = today.getMonth() - dob.getMonth();
+    if (months < 0) {
+      years -= 1;
+      months += 12;
+    }
+    ageText.textContent = `Age: ${years} years ${months > 0 ? months + " months" : ""}`;
+  });
+}
+
+</script>
+
+{% endblock %}
