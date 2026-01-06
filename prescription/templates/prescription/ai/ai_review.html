@@ -1,0 +1,150 @@
+{% extends "prescription/ai/base_ai_wizard.html" %}
+{% load static %}
+
+{% block title %}Review & Finalize{% endblock %}
+
+{% block step_title %}Step 7 · Review & Finalize{% endblock %}
+{% block step_subtitle %}
+Please review all details before finalizing the prescription.
+{% endblock %}
+
+{% block step_content %}
+
+<div class="row g-3">
+
+  <!-- LEFT: NOTES -->
+  <div class="col-md-6">
+    <div class="card shadow-sm">
+      <div class="card-header bg-primary text-white fw-semibold d-flex justify-content-between">
+        <span>Clinical Notes</span>
+      </div>
+
+      <div class="card-body small">
+
+        {% if history %}
+        <p>
+          <strong>History:</strong><br>
+          {{ history|linebreaks }}
+        </p>
+        {% endif %}
+
+        {% if symptoms %}
+        <p>
+          <strong>Symptoms:</strong><br>
+          {{ symptoms|linebreaks }}
+        </p>
+        {% endif %}
+
+        {% if findings %}
+        <p>
+          <strong>Findings:</strong><br>
+          {{ findings|linebreaks }}
+        </p>
+        {% endif %}
+
+        {% if diagnosis %}
+        <p>
+          <strong>Diagnosis:</strong><br>
+          {{ diagnosis|linebreaks }}
+        </p>
+        {% endif %}
+
+        {% if general_advice %}
+        <p>
+          <strong>General Advice:</strong><br>
+          {{ general_advice|linebreaks }}
+        </p>
+        {% endif %}
+
+      </div>
+
+    </div>
+  </div>
+
+  <!-- RIGHT: DRUG LIST -->
+  <div class="col-md-6">
+    <div class="card shadow-sm">
+      <div class="card-header bg-info text-white fw-semibold">
+        Prescription
+      </div>
+
+      <div class="card-body small">
+
+        {% if drugs %}
+        <ul class="list-group">
+
+          {% for d in drugs %}
+          <li class="list-group-item">
+
+            <strong>{{ d.drug_name }}</strong>
+
+            {% if d.composition %}
+              <br><span class="text-muted small">({{ d.composition }})</span>
+            {% endif %}
+
+            <br>
+            <span class="text-muted">
+              {{ d.dosage }} • {{ d.frequency }} • {{ d.duration }}
+              {% if d.food_order %}
+                • Food: {{ d.food_order }}
+              {% endif %}
+            </span>
+
+          </li>
+          {% endfor %}
+
+        </ul>
+
+        {% else %}
+        <p class="text-muted">No medicines added.</p>
+        {% endif %}
+
+      </div>
+    </div>
+  </div>
+
+</div>
+
+<!-- BUTTONS -->
+<div class="d-flex justify-content-between mt-4">
+  <a href="{% url 'ai_rx_prescription_manual' draft.id %}" class="btn btn-outline-secondary">
+    ← Back
+  </a>
+
+  <button id="finalize-btn"
+          data-url="{% url 'ai_rx_finalize' draft.id %}"
+          class="btn btn-success">
+    Finalize Prescription →
+  </button>
+</div>
+
+<!-- JS -->
+<script>
+document.getElementById("finalize-btn").addEventListener("click", function () {
+    const url = this.dataset.url;
+
+    fetch(url, {
+        method: "POST",
+        headers: { "X-CSRFToken": "{{ csrf_token }}" },
+    })
+    .then(response => response.json())
+    .then(data => {
+
+        if (data.redirect) {
+            window.location.href = data.redirect;
+            return;
+        }
+
+        alert(data.error || "Unexpected error while finalizing.");
+    })
+    .catch(err => {
+        alert("Server error: " + err);
+    });
+});
+document.addEventListener("DOMContentLoaded", function () {
+    Autosave.init();
+});
+</script>
+
+
+{% endblock %}

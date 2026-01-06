@@ -1,0 +1,290 @@
+{% extends "base_sidebar.html" %}
+{% block title %}AI Prescription Wizard{% endblock %}
+
+{% block content %}
+<style>
+/* Sticky only on large screens */
+@media (min-width: 992px) {
+  .ai-left-panel {
+    position: sticky;
+    top: 80px;
+    max-height: calc(100vh - 100px);
+    overflow-y: auto;
+  }
+}
+
+/* On smaller screens, remove fixed height */
+@media (max-width: 991px) {
+  .ai-left-panel {
+    position: static !important;
+    max-height: none !important;
+  }
+}
+</style>
+
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/tom-select/dist/css/tom-select.bootstrap5.css">
+<script src="https://cdn.jsdelivr.net/npm/tom-select/dist/js/tom-select.complete.min.js"></script>
+{% if patient %}
+<div id="autosave-status" style="position: fixed; top: 12px; right: 20px; z-index: 1050;"
+     class="small text-muted">  Saved ✓</div>
+<div class="alert alert-light border d-flex align-items-center mb-3" style="font-size:0.95rem;">
+    <div class="me-3">
+        <strong>👤 {{ patient.patient_name }}</strong>
+    </div>
+
+    <div class="text-muted me-3">
+        {{ patient.age_years }}y {{ patient.age_months }}m
+    </div>
+
+    <div class="text-muted me-3">
+        {{ patient.get_gender_display }}
+    </div>
+
+    {% if patient.contact.mobile_num %}
+        <div class="text-muted">
+            {{ patient.contact.mobile_num }}
+        </div>
+    {% endif %}
+</div>
+{% endif %}
+
+<div class="container-fluid py-3">
+  <div class="row g-3">
+
+    <!-- ========================================= -->
+    <!-- LEFT: SUMMARY PANEL -->
+    <!-- ========================================= -->
+    <div class="col-xl-3 col-lg-4 col-md-12 order-2 order-lg-1">
+
+      <div class="card shadow-sm ai-left-panel">
+
+        <div class="card-header bg-light">
+          <div class="d-flex align-items-center">
+            <i class="bi bi-clipboard-pulse me-2"></i>
+            <span class="fw-semibold">Visit Summary</span>
+          </div>
+        </div>
+
+        <div class="card-body">
+
+          <!-- Steps (Responsive Pills) -->
+          <div class="mb-3">
+            <div class="small text-muted mb-1">Steps</div>
+            <div class="d-flex flex-wrap gap-2">
+
+              <span class="badge rounded-pill {% if draft.data.history %}bg-success{% else %}bg-secondary{% endif %}">1. History</span>
+
+              <span class="badge rounded-pill {% if draft.data.symptoms %}bg-success{% else %}bg-secondary{% endif %}">2. Symptoms</span>
+
+              <span class="badge rounded-pill {% if draft.data.findings %}bg-success{% else %}bg-secondary{% endif %}">3. Findings</span>
+
+              <span class="badge rounded-pill {% if draft.data.diagnosis %}bg-success{% else %}bg-secondary{% endif %}">4. Diagnosis</span>
+
+              <span class="badge rounded-pill {% if draft.data.ai_notes %}bg-info{% else %}bg-secondary{% endif %}">5. AI Suggestions</span>
+
+              <span class="badge rounded-pill {% if draft.data.drugs %}bg-info{% else %}bg-secondary{% endif %}">6. Prescription</span>
+
+            </div>
+          </div>
+
+          <hr>
+
+          <!-- HISTORY -->
+          <div class="mb-3">
+            <div class="d-flex align-items-center mb-1">
+              <i class="bi bi-journal-medical me-2"></i>
+              <span class="fw-semibold">History</span>
+            </div>
+            <p class="small mb-0 text-muted">
+              {{ draft.data.history|default:"Not entered yet."|linebreaksbr }}
+            </p>
+          </div>
+
+          <!-- SYMPTOMS -->
+          <div class="mb-3">
+            <div class="d-flex align-items-center mb-1">
+              <i class="bi bi-thermometer-half me-2"></i>
+              <span class="fw-semibold">Symptoms</span>
+            </div>
+            <p class="small mb-0 text-muted">
+              {{ draft.data.symptoms|default:"Not entered yet."|linebreaksbr }}
+            </p>
+          </div>
+
+          <!-- FINDINGS -->
+          <div class="mb-3">
+            <div class="d-flex align-items-center mb-1">
+              <i class="bi bi-search-heart me-2"></i>
+              <span class="fw-semibold">Findings</span>
+            </div>
+            <p class="small mb-0 text-muted">
+              {{ draft.data.findings|default:"Not entered yet."|linebreaksbr }}
+            </p>
+          </div>
+
+          <!-- DIAGNOSIS -->
+          <div class="mb-3">
+            <div class="d-flex align-items-center mb-1">
+              <i class="bi bi-clipboard2-pulse me-2"></i>
+              <span class="fw-semibold">Diagnosis</span>
+            </div>
+            <p class="small mb-0 text-muted">
+              {{ draft.data.diagnosis|default:"Not entered yet."|linebreaksbr }}
+            </p>
+          </div>
+
+          <!-- AI NOTES -->
+          {% if draft.data.ai_notes %}
+          <div class="mb-3">
+            <div class="d-flex align-items-center mb-1">
+              <i class="bi bi-robot me-2"></i>
+              <span class="fw-semibold">AI Summary</span>
+            </div>
+            <p class="small text-muted">
+              {{ draft.data.ai_notes.summary|default:"No AI summary."|linebreaksbr }}
+            </p>
+          </div>
+          {% endif %}
+
+          <!-- DRUGS -->
+          <div class="mb-2">
+            <div class="d-flex align-items-center mb-1">
+              <i class="bi bi-capsule-pill me-2"></i>
+              <span class="fw-semibold">Current Prescription</span>
+            </div>
+
+            {% if draft.data.drugs %}
+            <ul class="list-group small">
+              {% for d in draft.data.drugs %}
+              <li class="list-group-item py-1 px-2">
+                <strong>{{ d.drug_name }}</strong><br>
+                <span class="text-muted">
+                  {{ d.dosage }} • {{ d.frequency }} • {{ d.duration }}
+                  {% if d.food_order %} • Food: {{ d.food_order }} {% endif %}
+                </span>
+              </li>
+              {% endfor %}
+            </ul>
+            {% else %}
+            <p class="small text-muted">No medicines added yet.</p>
+            {% endif %}
+          </div>
+
+        </div>
+      </div>
+    </div>
+
+    <!-- ========================================= -->
+    <!-- RIGHT: STEP PANEL -->
+    <!-- ========================================= -->
+    <div class="col-xl-9 col-lg-8 col-md-12 order-1 order-lg-2">
+
+      <div class="d-flex justify-content-between align-items-center mb-3">
+        <div>
+          <h4 class="mb-0">
+            {% block step_title %}{% endblock %}
+          </h4>
+          <div class="text-muted small">
+            {% block step_subtitle %}{% endblock %}
+          </div>
+        </div>
+
+        <span class="badge bg-primary-subtle text-primary border d-none d-md-inline">
+          Draft #{{ draft.id }}
+        </span>
+      </div>
+
+      <div class="card shadow-sm">
+        <div class="card-body">
+          {% block step_content %}{% endblock %}
+        </div>
+      </div>
+
+    </div>
+
+  </div>
+</div>
+<script>
+function copyToTextarea(textareaId, content) {
+    const textarea = document.getElementById(textareaId);
+    if (!textarea) return;
+
+    if (textarea.value.trim()) {
+        textarea.value += "\n\n" + content.trim();
+    } else {
+        textarea.value = content.trim();
+    }
+    textarea.focus();
+}
+const Autosave = (function () {
+    let timer = null;
+    let stateEl = null;
+
+    function init() {
+        stateEl = document.getElementById("autosave-status");
+        setSaved();
+    }
+
+    function setSaving() {
+        if (stateEl) {
+            stateEl.textContent = "Saving…";
+            stateEl.className = "small text-warning";
+        }
+    }
+
+    function setSaved() {
+        if (stateEl) {
+            stateEl.textContent = "Saved ✓";
+            stateEl.className = "small text-success";
+        }
+    }
+
+    function setError() {
+        if (stateEl) {
+            stateEl.textContent = "Save failed ⚠";
+            stateEl.className = "small text-danger";
+        }
+    }
+
+    function save(field, value, delay = 400) {
+        if (!field) return;
+
+        if (timer) clearTimeout(timer);
+
+        setSaving();
+
+        timer = setTimeout(() => {
+            fetch("{% url 'prescription:ai_rx_autosave' draft.id %}", {
+                method: "POST",
+                headers: {
+                    "X-CSRFToken": "{{ csrf_token }}",
+                    "Content-Type": "application/x-www-form-urlencoded"
+                },
+                body: new URLSearchParams({
+                    field: field,
+                    value: value
+                })
+            })
+            .then(r => r.json())
+            .then(data => {
+                if (data.status === "ok") {
+                    setSaved();
+                } else {
+                    setError();
+                }
+            })
+            .catch(() => {
+                setError();
+            });
+        }, delay);
+    }
+
+    return {
+        init,
+        save
+    };
+})();
+</script>
+
+
+{% endblock %}

@@ -1,0 +1,117 @@
+{% extends "prescription/ai/base_ai_wizard.html" %}
+{% block title %}AI Clinical Suggestions{% endblock %}
+
+{% block step_title %}Step 5 · AI Clinical Suggestions{% endblock %}
+{% block step_subtitle %}
+AI summarizes notes, suggests differentials and possible investigations. Final decision is always yours.
+{% endblock %}
+
+{% block step_content %}
+<div class="mb-3 text-end">
+  <a href="?refresh=1" class="btn btn-outline-secondary btn-sm">
+    <i class="bi bi-arrow-repeat"></i> Refresh AI Suggestions
+  </a>
+</div>
+
+{% if ai_data.error %}
+  <div class="alert alert-warning">
+    <strong>AI suggestions are currently unavailable.</strong><br>
+    <span class="small">{{ ai_data.error }}</span><br>
+    You can continue and write the prescription manually.
+  </div>
+
+  <div class="mt-3 text-end">
+    <a href="{% url 'ai_rx_prescription' draft.id %}" class="btn btn-primary">
+      Continue to Prescription →
+    </a>
+  </div>
+
+{% else %}
+
+  <div class="card mb-4 shadow-sm">
+    <div class="card-header bg-light fw-semibold">
+      Summary
+    </div>
+    <div class="card-body">
+      <p class="mb-0 small">
+        {{ ai_data.summary|default:"No AI summary available." }}
+      </p>
+    </div>
+  </div>
+
+  <div class="card mb-4 shadow-sm">
+    <div class="card-header bg-light fw-semibold">
+      Differential Diagnoses
+    </div>
+    <div class="card-body">
+      <ul class="small mb-0">
+        {% for item in ai_data.differential_diagnoses %}
+          <li>{{ item }}</li>
+        {% empty %}
+          <li>No differential diagnoses suggested.</li>
+        {% endfor %}
+      </ul>
+    </div>
+  </div>
+
+  <div class="card mb-4 shadow-sm">
+    <div class="card-header bg-light fw-semibold">
+      Suggested Investigations
+    </div>
+    <div class="card-body">
+      <ul class="small mb-0">
+        {% for test in ai_data.suggested_tests %}
+          <li>{{ test }}</li>
+        {% empty %}
+          <li>No investigations suggested.</li>
+        {% endfor %}
+      </ul>
+    </div>
+  </div>
+
+  <div class="card mb-4 shadow-sm">
+    <div class="card-header bg-light fw-semibold">
+      Red Flags (Important)
+    </div>
+    <div class="card-body">
+      <ul class="small mb-0 text-danger">
+        {% for flag in ai_data.red_flags %}
+          <li>{{ flag }}</li>
+        {% empty %}
+          <li>No specific red flags mentioned.</li>
+        {% endfor %}
+      </ul>
+    </div>
+  </div>
+
+  <div class="card mb-4 shadow-sm">
+    <div class="card-header bg-light fw-semibold">
+      General Notes / Advice
+    </div>
+    <div class="card-body">
+      <ul class="small mb-0">
+        {% for note in ai_data.notes %}
+          <li>{{ note }}</li>
+        {% empty %}
+          <li>No additional notes.</li>
+        {% endfor %}
+      </ul>
+    </div>
+  </div>
+
+  <div class="d-flex justify-content-between mt-4">
+    <a href="{% url 'ai_rx_diagnosis' draft.id %}" class="btn btn-outline-secondary">
+      ← Back: Diagnosis
+    </a>
+    <a href="{% url 'ai_rx_prescription' draft.id %}" class="btn btn-primary">
+      Continue to Prescription →
+    </a>
+  </div>
+<script>
+document.addEventListener("DOMContentLoaded", function () {
+    Autosave.init();
+});
+</script>
+
+{% endif %}
+{% endblock %}

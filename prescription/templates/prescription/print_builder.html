@@ -1,0 +1,251 @@
+{% load static %}
+
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>Prescription — Print</title>
+
+<style>
+  :root{
+    --brand:#0b6efd; --ink:#1f2937; --muted:#6b7280; --paper:#ffffff;
+    --bg:#f5f7fb; --border:#e5e7eb;
+  }
+  *{box-sizing:border-box}
+  body{ margin:0; font:14px/1.45 system-ui,-apple-system,Segoe UI,Roboto,Arial,sans-serif; color:var(--ink); background:var(--bg); }
+  header.appbar{ position:sticky; top:0; z-index:5; background:#fff; border-bottom:1px solid var(--border);
+                 padding:10px 16px; display:flex; gap:10px; align-items:center; justify-content:space-between; }
+  header .actions{display:flex; gap:8px; flex-wrap:wrap}
+  button{ background:var(--brand); color:#fff; border:none; border-radius:8px; padding:10px 14px; font-weight:600; cursor:pointer; box-shadow:0 1px 0 rgba(0,0,0,.04);}
+  button.secondary{background:#eef2ff; color:#3730a3}
+  button.ghost{background:transparent; color:var(--brand)}
+  button:disabled{opacity:.5; cursor:not-allowed}
+  .container{ display:grid; grid-template-columns: 420px 1fr; gap:18px; padding:18px; max-width:1400px; margin:0 auto; }
+  .card{ background:var(--paper); border:1px solid var(--border); border-radius:12px; padding:16px; box-shadow:0 6px 20px rgba(18,38,63,.03); }
+  .section-title{font-size:12px; letter-spacing:.08em; text-transform:uppercase; color:var(--muted); margin:4px 0 12px}
+  .row{display:grid; grid-template-columns:1fr 1fr; gap:10px}
+  label{font-size:12px; color:var(--muted); display:block; margin-bottom:6px}
+  input, select, textarea{ width:100%; padding:10px 12px; border:1px solid var(--border); border-radius:8px; background:#fff; font:inherit; color:inherit; outline:none; }
+  textarea{min-height:76px; resize:vertical}
+  .med-table{width:100%; border-collapse:collapse}
+  .med-table th,.med-table td{border-bottom:1px dashed #e6e6e6; padding:8px 6px; text-align:left; vertical-align:top}
+  .med-table th{font-size:12px; color:var(--muted); font-weight:600}
+  .med-actions{display:flex; gap:8px}
+  .small{font-size:12px}
+  .rx-preview{ background:#fff; padding:26px; border:1px solid var(--border); border-radius:12px; width:100%; min-height:600px; }
+  .rx-header{display:flex; align-items:center; justify-content:space-between; gap:16px}
+  .rx-doc h1{margin:0; font-size:20px}
+  .rx-doc p{margin:2px 0; color:var(--muted)}
+  .rx-brand{font-weight:800; color:var(--brand)}
+  .rx-divider{border:none; border-top:2px solid #111; margin:12px 0}
+  .rx-grid{display:grid; grid-template-columns:1fr 1fr; gap:8px}
+  .rx-section h3{margin:12px 0 6px; font-size:14px; border-bottom:1px solid var(--border); padding-bottom:4px}
+  .rx-ul{margin:6px 0 0 16px}
+  .rx-footer{display:flex; justify-content:space-between; align-items:flex-end; margin-top:34px}
+  .sig-box{height:60px; border-bottom:1px solid #111; min-width:240px}
+  .badge{ display:inline-block; padding:2px 8px; font-size:12px; background:#ecfeff; color:#0e7490; border:1px solid #a5f3fc; border-radius:999px; }
+  .help{color:var(--muted)}
+  .rx-table{width:100%; border-collapse:collapse; margin-top:6px}
+  .rx-table th,.rx-table td{border:1px solid #ddd; padding:8px; font-size:13px}
+  .rx-table th{background:#fafafa}
+  @media print {
+  header.appbar, .form-panel { display: none !important; }
+  body { background: #fff; }
+  .container { display: block; padding: 0; }
+  .card { border: none; box-shadow: none; padding: 0; }
+  .rx-preview {
+    border: none; border-radius: 0;
+    padding: 18mm;
+    padding-top: var(--print-top, 40mm); /* uses the inline custom property */
+  }
+}
+
+
+/* Hide left form when body has .hide-form */
+.hide-form .form-panel { display: none !important; }
+.hide-form .container  { grid-template-columns: 1fr; }
+
+
+  /* Print – hide app bar + make room for letterhead */
+  /* in your <style> */
+#vNotes { white-space: pre-wrap; }
+
+</style>
+</head>
+<body class="{% if hide_form %}hide-form{% endif %}">
+    <header class="appbar">
+    <div class="brand"><span class="rx-brand">Rx</span> Preview</div>
+    <div class="actions">
+      {% if hide_form %}
+      <button type="button" onclick="window.print()">🖨️ Print</button>
+      {% else %}
+      <button type="button" class="secondary" id="fillDemo">Fill Demo</button>
+      <button type="button" class="ghost" id="clearForm">Clear</button>
+      <button type="button" onclick="window.print()">🖨️ Print</button>
+      {% endif %}
+    </div>
+  </header>
+
+  <main class="container">
+    <!-- LEFT: FORM (hidden when hide_form=True) -->
+    <section class="card form-panel" aria-label="Prescription Form">
+      <!-- keep your original left form here unchanged -->
+      <!-- … (omitted for brevity; you can paste your whole form) … -->
+    </section>
+
+    <!-- RIGHT: PREVIEW -->
+    <section class="card">
+      <div class="rx-preview" style="--print-top: {{ print_top_mm|default:40 }}mm;">
+        <div class="rx-header">
+          <div class="rx-doc">
+            <h1 id="vDoc">—</h1>
+            <p id="vQual">—</p>
+            <p id="vClinic">—</p>
+            <p class="small" id="vContact">—</p>
+          </div>
+          <div class="rx-meta" style="text-align:right">
+            <div class="badge">Prescription</div><br>
+            <span class="small" id="vDate"></span>
+          </div>
+        </div>
+
+        <hr class="rx-divider">
+
+        <div class="rx-grid">
+          <div><strong>Patient:</strong> <span id="vPatient">—</span></div>
+          <div style="text-align:right"><strong>Age:</strong> <span id="vAge">—</span> &nbsp; <strong>Gender:</strong> <span id="vGender">—</span></div>
+        </div>
+
+        <div class="rx-section">
+          <h3>Diagnosis / Complaint</h3>
+          <div id="vDiag" class="small">—</div>
+        </div>
+
+        <div class="rx-section">
+          <h3>Medications</h3>
+          <table class="rx-table" id="vMeds">
+            <thead>
+              <tr>
+                <th>Medicine</th><th>Dose</th><th>Frequency</th><th>Duration</th><th>Route</th>
+              </tr>
+            </thead>
+            <tbody><!-- items injected --></tbody>
+          </table>
+        </div>
+
+        <div class="rx-section">
+          <div class="rx-section">
+  <h3>Clinical Notes</h3>
+  <div class="rx-grid">
+    <div>
+      <strong>History</strong>
+      <div id="vHistory" class="small" style="white-space: pre-wrap">—</div>
+    </div>
+    <div>
+      <strong>Symptoms</strong>
+      <div id="vSymptoms" class="small" style="white-space: pre-wrap">—</div>
+    </div>
+  </div>
+  <div class="rx-grid">
+    <div>
+      <strong>Findings</strong>
+      <div id="vFindings" class="small" style="white-space: pre-wrap">—</div>
+        </div>
+        <div>
+          <strong>Advice</strong>
+          <div id="vAdvice" class="small" style="white-space: pre-wrap">—</div>
+        </div>
+      </div>
+    </div>
+
+          <h3>Advice / Notes</h3>
+          <div id="vNotes" class="small">—</div>
+        </div>
+
+        <div class="rx-footer">
+          <div class="small" id="vFollowup">Follow-up: —</div>
+          <div style="text-align:center">
+            <div class="sig-box" id="sigBox" title="Signature"></div>
+            <div class="small" id="vDoc2">—</div>
+          </div>
+        </div>
+      </div>
+    </section>
+  </main>
+  
+  {# Safe JSON payload with initial values from server #}
+  {{ initial|json_script:"initial-data" }}
+
+<script>
+(() => {
+  // If you kept the left form, wire it the same way; otherwise we just fill preview from server.
+  const data = JSON.parse(document.getElementById('initial-data').textContent || '{}');
+
+  const $ = (sel, root=document) => root.querySelector(sel);
+  const el = (tag, attrs={}) => Object.assign(document.createElement(tag), attrs);
+
+  const out = {
+    vDoc: $('#vDoc'), vDoc2: $('#vDoc2'), vQual: $('#vQual'), vClinic: $('#vClinic'), vContact: $('#vContact'),
+    vPatient: $('#vPatient'), vAge: $('#vAge'), vGender: $('#vGender'), vDate: $('#vDate'),
+    vDiag: $('#vDiag'), vNotes: $('#vNotes'), vFollowup: $('#vFollowup'),
+    vMedsBody: $('#vMeds').querySelector('tbody'),vHistory: $('#vHistory'),vSymptoms: $('#vSymptoms'),
+    vFindings: $('#vFindings'),vAdvice: $('#vAdvice'),
+
+  };
+
+  function textOrDash(v){ return (v && (''+v).trim()) ? (''+v).trim() : '—'; }
+  function formatDate(iso){
+    if(!iso) return '';
+    const d = new Date(iso + 'T00:00:00');
+    if (isNaN(d)) return '';
+    return d.toLocaleDateString(undefined, {year:'numeric', month:'short', day:'numeric'});
+  }
+
+  // Fill preview from server data
+  out.vDoc.textContent    = textOrDash(data.doctorName);
+  out.vDoc2.textContent   = out.vDoc.textContent;
+  out.vQual.textContent   = textOrDash(data.qualification);
+  out.vClinic.textContent = textOrDash(data.clinic);
+  out.vContact.textContent= textOrDash(data.contact);
+  out.vPatient.textContent= textOrDash(data.patientName);
+  out.vAge.textContent    = textOrDash(data.patientAge);
+  out.vGender.textContent = textOrDash(data.gender);
+  out.vDate.textContent   = formatDate(data.date) || '';
+  out.vDiag.textContent   = textOrDash(data.diagnosis);
+  out.vNotes.textContent  = textOrDash(data.notes);
+  out.vHistory.textContent  = textOrDash(data.history);
+  out.vSymptoms.textContent = textOrDash(data.symptoms);
+  out.vFindings.textContent = textOrDash(data.findings);
+  out.vAdvice.textContent   = textOrDash(data.advice);
+  out.vFollowup.textContent = 'Follow-up: ' + textOrDash(data.followup);
+
+  // Populate medications
+  out.vMedsBody.innerHTML = '';
+  (data.meds || []).forEach(row => {
+    const tr = el('tr');
+    [row.name, row.dose, row.freq, row.dur, row.route].forEach(val => {
+      tr.appendChild(el('td', { textContent: textOrDash(val) }));
+    });
+    out.vMedsBody.appendChild(tr);
+  });
+
+  // Optional: click-to-sign (kept from your version)
+  const sigBox = document.getElementById('sigBox');
+  if (sigBox) {
+    sigBox.addEventListener('click', ()=>{
+      const val = prompt('Type your initials or name for signature:');
+      sigBox.textContent = '';
+      if(val && val.trim()){
+        const s = el('div', {textContent: val.trim()});
+        s.style.fontFamily = 'cursive';
+        s.style.fontSize = '24px';
+        s.style.paddingTop = '14px';
+        sigBox.appendChild(s);
+      }
+    });
+  }
+})();
+</script>
+</body>
+</html>

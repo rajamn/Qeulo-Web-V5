@@ -1,0 +1,440 @@
+<script>
+function clearInfo() {
+  ['name','age','gender','source'].forEach(k => document.getElementById('patient-'+k).textContent = '—');
+  document.getElementById('details-patient-name').textContent = '—';
+}
+
+function loadPatient(id, src) {
+  if (!id) return clearInfo();
+  fetch(`{% url 'get_patient_details' %}?appointment=${id}`)
+    .then(r => r.json())
+    .then(d => {
+      document.getElementById('details-patient-name').textContent = d.patient_name || '—';
+      document.getElementById('patient-name').textContent = d.patient_name || '—';
+      document.getElementById('patient-age').textContent = `${d.age_years||0} y/${d.age_months||0} m`;
+      document.getElementById('patient-gender').textContent = d.gender||'—';
+      document.getElementById('patient-source').textContent = src;
+      updatePatientTabs(d.patient_name, d.age_years, d.gender);
+
+    })
+    .catch(() => clearInfo());
+}
+
+function handlePatientSelection(sel, src) {
+  if (!sel.value) return;
+  const key = (src === 'Queued') ? 'appointment' : 'completed_patient';
+  window.location.href = `{% url 'prescribe_patient' %}?${key}=${encodeURIComponent(sel.value)}`;
+}
+
+document.addEventListener('DOMContentLoaded', () => {
+// 1️⃣ TomSelect for notes/history fields
+  ['notes_history','notes_symptoms','notes_findings','general_advice'].forEach(f => {
+    const el = document.getElementById('id_' + f);
+    if (el && !el.tomselect) {
+      const ts = new TomSelect(el, {
+        create: true,
+        maxItems: null,
+        plugins: ['remove_button'],
+        hideSelected: true,
+        persist: false
+      });
+      if (el.value) ts.setValue(el.value.split(',').map(v => v.trim()));
+    }
+  });
+
+
+
+  // Normalize TomSelect values on submit (CharField-friendly)
+  const formEl = document.querySelector('#prescription-form');
+  function normalizeNotes() {
+  NOTE_FIELDS.forEach(f => {
+    const el = document.getElementById('id_' + f);
+    if (el && el.tomselect) {
+      const vals = el.tomselect.getValue();
+      el.value = Array.isArray(vals) ? vals.join(', ') : (vals || '');
+    }
+  });
+}
+
+formEl?.addEventListener('submit', () => normalizeNotes());
+
+// If any JS does programmatic submit, prefer requestSubmit() so the submit event fires.
+// Also normalize on submit-button clicks as a safety net:
+document.querySelectorAll('#prescription-form button[type="submit"]').forEach(btn => {
+  btn.addEventListener('click', () => normalizeNotes(), { capture: true });
+});
+
+  formEl?.addEventListener('submit', () => {
+    NOTE_FIELDS.forEach(f => {
+      const el = document.getElementById('id_' + f);
+      if (el && el.tomselect) {
+        const vals = el.tomselect.getValue();
+        el.value = Array.isArray(vals) ? vals.join(', ') : (vals || '');
+      }
+    });
+  });
+
+  // ========== Autocomplete for existing drug-name inputs ========== 1
+  // ========== Autocomplete for existing drug-name inputs ==========
+document.querySelectorAll('input[name$="-drug_name"]').forEach(input => {
+  // prevent Enter from submitting while focused in this field
+  input.addEventListener('keydown', (e) => { if (e.key === 'Enter') e.preventDefault(); });
+
+  $(input).autocomplete({
+    source: "{% url 'drug_autocomplete' %}",
+    minLength: 2,
+    focus: (e, ui) => { e.preventDefault(); }, // keep the text while navigating suggestions
+    select: function(e, ui) {
+      e.preventDefault();                     // stop form submit on Enter
+      this.value = ui.item.label || ui.item.value || '';  // fill drug name
+
+      const row  = this.closest('tr');
+      const comp = row?.querySelector('textarea[name$="-composition"], input[name$="-composition"]');
+      if (comp) comp.value = ui.item.composition || '';
+      // (optional defaults if your endpoint returns them)
+      // row.querySelector('input[name$="-dosage"]')?.value    = ui.item.dosage    || '';
+      // row.querySelector('input[name$="-frequency"]')?.value = ui.item.frequency || '';
+      // row.querySelector('input[name$="-duration"]')?.value  = ui.item.duration  || '';
+      // row.querySelector('select[name$="-food_order"]')?.value = ui.item.food_order || '';
+    }
+  });
+});
+
+
+  // ========== “Add Item” handler (formset wiring) ==========
+  const formCount = document.querySelector('input[name="details-TOTAL_FORMS"]');
+  const tableBody = document.querySelector('#drug-table tbody');
+  const emptyForm = document.getElementById('empty-form');
+  const addBtn    = document.getElementById('add-row');
+// 🔒 prevent the hidden template row from being submitted
+  if (emptyForm) {
+    emptyForm.querySelectorAll('input, select, textarea').forEach(el => {
+      el.disabled = true;   // disabled fields are not submitted
+    });
+  }
+
+  addBtn.addEventListener('click', e => {
+  e.preventDefault();
+
+  const idx = parseInt(formCount.value, 10);
+
+  const clone = emptyForm.cloneNode(true);
+  clone.removeAttribute('id');
+  clone.style.display = '';
+
+  // 🔁 Replace __prefix__ OR any number with the new index
+  const re = /details-(?:__prefix__|\d+)-/g;
+
+  clone.querySelectorAll('input, select, textarea, label').forEach(el => {
+    // enable real inputs
+    if (el.tagName === 'INPUT' || el.tagName === 'SELECT' || el.tagName === 'TEXTAREA') {
+      el.disabled = false;
+      if (el.name) el.name = el.name.replace(re, `details-${idx}-`);
+      if (el.id)   el.id   = el.id.replace(re,   `details-${idx}-`);
+      // clear values
+      if (el.tagName === 'INPUT' || el.tagName === 'TEXTAREA') el.value = '';
+      if (el.type === 'checkbox' || el.type === 'radio') el.checked = false;
+    } else if (el.tagName === 'LABEL') {
+      const forAttr = el.getAttribute('for');
+      if (forAttr) el.setAttribute('for', forAttr.replace(re, `details-${idx}-`));
+    }
+  });
+
+  tableBody.appendChild(clone);
+  formCount.value = idx + 1;
+
+  // Bind autocomplete for the new drug_name input
+  const newInput = clone.querySelector('input[name$="-drug_name"]');
+if (newInput) {
+  newInput.addEventListener('keydown', (e) => { if (e.key === 'Enter') e.preventDefault(); });
+
+  $(newInput).autocomplete({
+    source: "{% url 'drug_autocomplete' %}",
+    minLength: 2,
+    focus: (e, ui) => { e.preventDefault(); },
+    select: function(e, ui) {
+      e.preventDefault();
+      this.value = ui.item.label || ui.item.value || ''; // set drug name
+
+      const row  = this.closest('tr');
+      const comp = row?.querySelector('textarea[name$="-composition"], input[name$="-composition"]');
+      if (comp) comp.value = ui.item.composition || '';
+      // optional: fill defaults if your endpoint returns them
+      // row.querySelector('input[name$="-dosage"]')?.value    = ui.item.dosage    || '';
+      // row.querySelector('input[name$="-frequency"]')?.value = ui.item.frequency || '';
+      // row.querySelector('input[name$="-duration"]')?.value  = ui.item.duration  || '';
+      // row.querySelector('select[name$="-food_order"]')?.value = ui.item.food_order || '';
+    }
+  });
+}
+
+});
+
+// ========== New prescription reset (preserves patient selection) ==========
+  document.getElementById('new-prescription')?.addEventListener('click', () => {
+    const queuedSel = document.getElementById('patient-queue');
+    const completedSel = document.getElementById('patient-completed');
+    const queuedVal = queuedSel ? queuedSel.value : '';
+    const completedVal = completedSel ? completedSel.value : '';
+
+    formEl.reset();
+
+    if (queuedSel && queuedVal) queuedSel.value = queuedVal;
+    if (completedSel && completedVal) completedSel.value = completedVal;
+
+    const rows = tableBody.querySelectorAll('tr.drug-row');
+    rows.forEach((r, i) => {
+      if (i > 0) r.remove();
+      else {
+        r.querySelectorAll('input, select, textarea').forEach(el => {
+          if (el.type === 'checkbox' || el.type === 'radio') el.checked = false;
+          else el.value = '';
+        });
+      }
+    });
+    formCount.value = 1;
+
+    NOTE_FIELDS.forEach(f => {
+      const el = document.getElementById('id_' + f);
+      if (el && el.tomselect) el.tomselect.clear();
+    });
+  });
+
+  // ========== Dropdown change events ==========
+  document.getElementById('patient-queue')?.addEventListener('change', function() {
+    handlePatientSelection(this, 'Queued');
+  });
+  document.getElementById('patient-completed')?.addEventListener('change', function() {
+    handlePatientSelection(this, 'Completed');
+  });
+
+  // ========== Templates: Select + Apply (append-only) ==========
+  const tplSelect = document.getElementById('rx-template-select');
+  const tplApply  = document.getElementById('btn-apply-template');
+
+  fetch("{% url 'rx_templates_list' %}")
+    .then(r => r.json())
+    .then(d => {
+      if (!d.ok) return;
+      d.templates.forEach(t => {
+        const opt = document.createElement('option');
+        opt.value = t.id;
+        opt.textContent = t.name;
+        tplSelect.appendChild(opt);
+      });
+    });
+
+  tplSelect?.addEventListener('change', () => {
+  tplApply.disabled = !tplSelect.value;
+});
+
+tplApply?.addEventListener('click', async () => {
+  const id = tplSelect.value;
+  if (!id) return;
+
+  try {
+    const res = await fetch(window.APPLY_RX_TEMPLATE_URL, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'X-CSRFToken': getCookie('csrftoken'),
+      },
+      credentials: 'same-origin',
+      body: JSON.stringify({ template_id: Number(id) })
+    });
+
+    const d = await res.json();
+    if (!res.ok || !d.ok) {
+      alert(d.error || 'Could not apply template');
+      return;
+    }
+    appendTemplateItems(d.items || []);
+  } catch {
+    alert('Network error while applying template');
+  }
+});
+
+  // Helpers
+  function currentDrugNameSet() {
+  const set = new Set();
+  document.querySelectorAll('#drug-table tbody tr.drug-row').forEach(r => {
+    const name = (r.querySelector('input[name$="-drug_name"]')?.value || '').trim().toLowerCase();
+    if (name) set.add(name);
+  });
+  return set;
+}
+
+
+  function getLastRow() {
+    const rows = document.querySelectorAll('#drug-table tbody tr');
+    return rows[rows.length - 1] || null;
+  }
+  function rowIsEmpty(row) {
+    const name = row?.querySelector('input[name$="-drug_name"]');
+    return !name || !name.value.trim();
+  }
+  function setVal(row, selector, val) {
+    const el = row.querySelector(selector);
+    if (!el) return;
+    el.value = val || '';
+    el.dispatchEvent(new Event('change', { bubbles: true }));
+    el.dispatchEvent(new Event('input',  { bubbles: true }));
+  }
+  function fillRow(row, it) {
+    setVal(row, 'input[name$="-drug_name"]',   it.drug_name);
+    setVal(row, 'textarea[name$="-composition"], input[name$="-composition"]', it.composition);
+    setVal(row, 'input[name$="-dosage"]',      it.dosage);
+    setVal(row, 'input[name$="-frequency"]',   it.frequency);
+    setVal(row, 'input[name$="-duration"]',    it.duration);
+    setVal(row, 'select[name$="-food_order"]', it.food_order);
+  }
+  function appendTemplateItems(items) {
+    if (!items.length) { alert('Template is empty'); return; }
+    let row = getLastRow();
+    let i = 0;
+    if (rowIsEmpty(row)) {
+      fillRow(row, items[0]);
+      i = 1;
+    }
+    for (; i < items.length; i++) {
+      addBtn.click();
+      row = getLastRow();
+      if (!row) { alert('Could not add a new row'); break; }
+      fillRow(row, items[i]);
+    }
+    document.getElementById('drug-table')?.scrollIntoView({ behavior: 'smooth' });
+  }
+});
+
+// Helper: get CSRF from cookie
+function getCookie(name) {
+  const m = document.cookie.match('(^|;)\\s*' + name + '\\s*=\\s*([^;]+)');
+  return m ? m.pop() : '';
+}
+
+document.getElementById('btn-save-template')?.addEventListener('click', async () => {
+  const name = (document.getElementById('save-template-name')?.value || '').trim();
+  if (!name) { alert('Please enter a template name'); return; }
+
+  // Collect current drug rows
+  const rows = [...document.querySelectorAll('#drug-table tbody tr.drug-row')];
+  const details = rows.map(r => ({
+    drug_name:  (r.querySelector('input[name$="-drug_name"]')?.value || '').trim(),
+    composition:(r.querySelector('textarea[name$="-composition"],input[name$="-composition"]')?.value || '').trim(),
+    dosage:     (r.querySelector('input[name$="-dosage"]')?.value || '').trim(),
+    frequency:  (r.querySelector('input[name$="-frequency"]')?.value || '').trim(),
+    duration:   (r.querySelector('input[name$="-duration"]')?.value || '').trim(),
+    food_order: (r.querySelector('select[name$="-food_order"]')?.value || '').trim(),
+  })).filter(it => it.drug_name);
+
+  if (!details.length) { alert('No items to save'); return; }
+
+  try {
+    const res = await fetch("{% url 'save_rx_template' %}", {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'X-CSRFToken': getCookie('csrftoken')
+      },
+      body: JSON.stringify({ name, details })
+    });
+    const data = await res.json();
+
+    if (!res.ok || !data.ok) {
+      alert(data.error || 'Failed to save template');
+      return;
+    }
+
+    // Close modal
+    const modalEl = document.getElementById('saveAsTemplateModal');
+    bootstrap.Modal.getInstance(modalEl)?.hide();
+
+    // Add to template dropdown
+    const sel = document.getElementById('rx-template-select');
+    if (sel) {
+      const opt = document.createElement('option');
+      opt.value = data.template_id;
+      opt.textContent = data.name;
+      sel.appendChild(opt);
+      sel.value = data.template_id;
+      document.getElementById('btn-apply-template')?.removeAttribute('disabled');
+    }
+
+    // Reset input
+    document.getElementById('save-template-name').value = '';
+    alert('Template saved successfully');
+  } catch (e) {
+    alert('Network error while saving template');
+  }
+});
+/* ============================================================
+   🧠 Dynamic patient name update across tabs
+============================================================ */
+function updatePatientTabs(name, age, gender) {
+  const parts = [];
+  if (name) parts.push(name.trim());
+  if (age) parts.push(`${age}y`);
+  if (gender) parts.push(gender[0].toUpperCase());
+  const display = parts.length ? " – " + parts.join(" ") : "";
+  document.getElementById("tab-notes-patient").textContent = display;
+  document.getElementById("tab-drugs-patient").textContent = display;
+}
+
+// 🔹 Initialize tab headers if patient info is already available (edit mode)
+document.addEventListener("DOMContentLoaded", () => {
+  const currentPatient = "{{ patient_info.name|default:'' }}";
+  if (currentPatient) updatePatientTabs(currentPatient);
+});
+/* ============================================================
+   🩺 Auto-refresh Vitals after return from Vitals page
+============================================================ */
+document.addEventListener("DOMContentLoaded", () => {
+  const urlParams = new URLSearchParams(window.location.search);
+  const updated = urlParams.get("vitals_updated"); // flag from redirect
+  const pid = "{{ patient_info.id|default:'' }}";
+  const aid = "{{ prescription_form.appointment.value|default:'' }}";
+
+  if (updated && pid) {
+    fetch(`/vitals/api_latest_vitals?patient_id=${pid}&appointment_id=${aid || ''}`)
+      .then(r => r.json())
+      .then(res => {
+        if (!res.ok || !res.data) return;
+
+        const v = res.data;
+        const el = document.getElementById("vitals-dropdown");
+        if (!el) return;
+
+        // Build updated HTML snippet
+        el.innerHTML = `
+          <div class="small text-muted mb-2">
+            Recorded ${v.recorded_at}${v.recorded_by ? ' by ' + v.recorded_by : ''}
+          </div>
+          <div class="row g-2">
+            <div class="col-6"><strong>Height</strong><br>${v.height_cm} cm</div>
+            <div class="col-6"><strong>Weight</strong><br>${v.weight_kg} kg</div>
+            <div class="col-6"><strong>BMI</strong><br>${v.bmi}</div>
+            <div class="col-6"><strong>Temp</strong><br>${v.temperature_c} °C</div>
+            <div class="col-6"><strong>BP</strong><br>${v.bp}</div>
+            <div class="col-6"><strong>SpO₂</strong><br>${v.spo2_percent} %</div>
+            <div class="col-6"><strong>Pulse</strong><br>${v.pulse_bpm} bpm</div>
+            ${v.notes ? `<div class="col-12"><strong>Notes</strong><br>${v.notes}</div>` : ''}
+          </div>
+          <div class="mt-3 d-flex justify-content-end">
+            <a class="btn btn-sm btn-outline-primary" 
+               href="{{ vitals_url }}?next=${encodeURIComponent(window.location.pathname + window.location.search)}">
+               Add / Edit Vitals
+            </a>
+          </div>
+        `;
+
+        // 💡 Animate highlight to show update
+        el.style.transition = "background-color 0.8s ease";
+        el.style.backgroundColor = "#e8f5e9";
+        setTimeout(() => el.style.backgroundColor = "", 1500);
+      })
+      .catch(() => {});
+  }
+});
+
+
+</script>

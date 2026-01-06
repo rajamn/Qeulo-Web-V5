@@ -1,0 +1,191 @@
+{% extends "prescription/ai/base_ai_wizard.html" %}
+{% block title %}Symptoms — AI Prescription{% endblock %}
+
+{% block step_title %}Step 2 · Symptoms{% endblock %}
+{% block step_subtitle %}
+List key symptoms in a structured way (short phrases or bullet-style lines).
+{% endblock %}
+
+{% block step_content %}
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/tom-select/dist/css/tom-select.bootstrap5.css">
+
+<style>
+.ts-control .item {
+    background-color: #eef5ff;
+    border-radius: 12px;
+    padding: 2px 8px;
+    margin-right: 4px;
+}
+</style>
+
+<form method="post" novalidate>
+    {% csrf_token %}
+
+    <div class="mb-3">
+        <label class="form-label fw-semibold">Add Standard Symptoms</label>
+
+        <div style="width:50%;">
+            <select id="std-symptoms-select" multiple placeholder="Search symptoms…" autocomplete="off">
+              {% for group, items in std_symptoms.items %}
+                <optgroup label="{{ group }}">
+                    {% for item in items %}
+                        <option value="{{ item }}" data-group="{{ group }}">{{ item }}</option>
+                    {% endfor %}
+                </optgroup>
+
+              {% endfor %}
+
+              <optgroup label="My Custom Symptom Templates">
+                {% for t in doctor_templates %}
+                  <option value="{{ t.content }}" data-group="My Custom Symptom Templates">{{ t.label }}</option>
+                {% endfor %}
+              </optgroup>
+            </select>
+        </div>
+        {% if draft.data.carried.notes_symptoms %}
+            <div class="alert bg-light border p-3 mb-3">
+            <strong>Previous Symptoms:</strong>
+            <pre class="small">{{ draft.data.carried.notes_symptoms }}</pre>
+
+            <button type="button"
+                    class="btn btn-sm btn-outline-primary"
+                    onclick="copyToTextarea('id_symptoms', `{{ draft.data.carried.notes_symptoms|escapejs }}`)">
+                Copy Symptoms →
+            </button>
+            </div>
+        {% endif %}
+
+
+        <label for="id_symptoms" class="form-label fw-semibold mt-3">Symptoms</label>
+
+        <textarea
+            id="id_symptoms"
+            name="symptoms"
+            class="form-control"
+            rows="8"
+            placeholder="E.g. High-grade fever, headache, myalgia, no cough..."
+        >{{ symptoms }}</textarea>
+
+        <div class="form-text">
+            Select symptoms above or type freely.
+        </div>
+    </div>
+
+    <div class="d-flex justify-content-between mt-3">
+        <a href="{% url 'prescription:ai_rx_history' draft.id %}" class="btn btn-outline-secondary">
+          ← Back: History
+        </a>
+
+        <button type="submit" class="btn btn-primary">
+          Next: Findings →
+        </button>
+    </div>
+</form>
+
+
+<script src="https://cdn.jsdelivr.net/npm/tom-select/dist/js/tom-select.complete.min.js"></script>
+
+<script>
+document.addEventListener("DOMContentLoaded", function() {
+
+    const textarea = document.getElementById("id_symptoms");
+
+    const ts = new TomSelect("#std-symptoms-select", {
+        plugins: ["remove_button"],
+        persist: false,
+        maxItems: null,
+
+        onItemAdd: function(value) {
+
+            let group = "Symptoms";
+
+            // optgroup ID (like "1", "2")
+            const groupId = this.options[value] && this.options[value].optgroup;
+
+            // Fetch the REAL optgroup name (label)
+            if (groupId && this.optgroups[groupId]) {
+                group = this.optgroups[groupId].label;
+            }
+
+
+            // Custom templates
+            if (group === "My Custom Symptom Templates") {
+                insertCustomTemplate(value);
+                beautify();
+                return;
+            }
+
+            insertSymptom(group, value);
+            beautify();
+        },
+
+
+
+        onItemRemove: function(value) {
+            removeSymptom(value);
+            beautify();
+        }
+    });
+
+    function getGroup(optionEl) {
+        const g = optionEl.closest("[data-group]");
+        return g ? g.dataset.group : "Other";
+    }
+
+    function formatHeading(group) {
+        return "▪ " + group + ":";   // Clean and simple
+    }
+
+    function ensureSection(group) {
+        const heading = formatHeading(group);
+        if (!textarea.value.includes(heading)) {
+            if (textarea.value.trim()) textarea.value += "\n\n" + heading + "\n";
+            else textarea.value = heading + "\n";
+        }
+    }
+
+    function insertSymptom(group, value) {
+        ensureSection(group);
+
+        const heading = formatHeading(group);
+        const lines = textarea.value.split("\n");
+        const result = [];
+
+        lines.forEach(line => {
+            result.push(line);
+            if (line.trim() === heading) result.push("- " + value);
+        });
+
+        textarea.value = result.join("\n");
+    }
+
+    function removeSymptom(value) {
+        const lines = textarea.value.split("\n");
+        textarea.value = lines.filter(line => line.trim() !== "- " + value).join("\n");
+    }
+
+    function insertCustomTemplate(content) {
+        if (textarea.value.trim()) textarea.value += "\n\n" + content.trim() + "\n";
+        else textarea.value = content.trim() + "\n";
+    }
+
+    function beautify() {
+        let text = textarea.value;
+        text = text.replace(/\n{3,}/g, "\n\n");
+        text = text.split("\n").map(line => line.trimEnd()).join("\n");
+        textarea.value = text;
+    }
+
+});
+document.addEventListener("DOMContentLoaded", function () {
+    Autosave.init();
+});
+
+document.getElementById("id_symptoms")
+  .addEventListener("input", e => {
+      Autosave.save("symptoms", e.target.value);
+  });
+</script>
+
+
+{% endblock %}

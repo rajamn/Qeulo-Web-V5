@@ -1,0 +1,112 @@
+{% extends 'base_sidebar.html' %}
+{% load static %}
+{% block title %}View Prescriptions{% endblock %}
+
+{% block content %}
+<div class="container mt-4">
+
+  <h2 class="text-primary mb-4">Prescriptions</h2>
+
+  <!-- Filter -->
+  <form method="get" class="row g-2 align-items-end mb-3">
+    <div class="col-md-3">
+      <label class="form-label">Doctor</label>
+      <select name="doctor"
+              class="form-select form-select-sm"
+              onchange="this.form.submit()">
+        <option value="">All Doctors</option>
+        {% for doc in doctors %}
+          <option value="{{ doc.pk }}"
+            {% if selected_doctor and doc.pk == selected_doctor.pk %}selected{% endif %}>
+            {{ doc.doctor_name }}
+          </option>
+        {% endfor %}
+      </select>
+    </div>
+
+    {% if selected_doctor %}
+      <div class="col-auto">
+        <a href="{% url 'prescription:prescription:view_prescriptions' %}"
+           class="btn btn-outline-secondary btn-sm">
+          Clear
+        </a>
+      </div>
+    {% endif %}
+  </form>
+
+  {% if prescriptions %}
+    {% for pres in prescriptions %}
+      <div class="card shadow-sm border-0 mb-3 p-3">
+
+        <!-- ROW 1: PATIENT SUMMARY -->
+        <div class="d-flex justify-content-between flex-wrap">
+          <div>
+            <h5 class="mb-1">{{ pres.patient.patient_name }}</h5>
+            <div class="text-muted small">
+              {{ pres.patient.age_years }}y {{ pres.patient.age_months }}m • {{ pres.patient.gender }}<br>
+              {{ pres.patient.contact.contact_name }}
+              ({{ pres.patient.contact.mobile_num }})
+            </div>
+          </div>
+
+          <div class="text-end small text-muted">
+            {% if pres.appointment %}
+              <div><strong>{{ pres.appointment.appointment_on|date:"M j, Y" }}</strong></div>
+              <div>{{ pres.appointment.appointment_time }}</div>
+              <div>{{ pres.appointment.doctor.doctor_name }}</div>
+            {% else %}
+              <div class="text-muted">Appointment not linked</div>
+            {% endif %}
+          </div>
+        </div>
+
+        <hr class="my-2">
+
+        <!-- ACTION ROW -->
+
+        {% url 'prescription_print' pres.pk as print_url %}
+
+        <div class="d-flex flex-wrap gap-2">
+          <a class="btn btn-outline-success btn-sm"
+            href="{{ print_url }}"
+            target="_blank">
+            Letterhead Print
+          </a>
+
+          <a class="btn btn-outline-primary btn-sm"
+            href="{{ print_url }}"
+            target="_blank">
+            View PDF
+          </a>
+
+          <a class="btn btn-outline-secondary btn-sm"
+            href="{{ print_url }}?dl=1">
+            Download PDF
+          </a>
+
+          {% if pres.appointment and pres.appointment.id %}
+            <a class="btn btn-outline-secondary btn-sm"
+              href="{% url 'patients:token_pdf' pres.appointment.id %}"
+              target="_blank">
+              Token
+            </a>
+
+            {% if pres.appointment.payment %}
+              <a class="btn btn-outline-primary btn-sm"
+                href="{% url 'patients:cash_receipt_pdf' pres.appointment.id %}"
+                target="_blank">
+                Receipt
+              </a>
+            {% endif %}
+          {% endif %}
+        </div>
+      </div>
+    {% endfor %}
+  {% else %}
+    <p class="text-muted mt-4">
+      No prescriptions found
+      {% if selected_doctor %}for {{ selected_doctor.doctor_name }}{% endif %}.
+    </p>
+  {% endif %}
+</div>
+{% endblock %}

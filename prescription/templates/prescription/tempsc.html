@@ -1,0 +1,131 @@
+<script>
+function clearInfo() {
+  ['name','age','gender','source'].forEach(k => document.getElementById('patient-'+k).textContent = '—');
+  document.getElementById('details-patient-name').textContent = '—';
+}
+
+function loadPatient(id, src) {
+  if (!id) return clearInfo();
+  fetch(`{% url 'get_patient_details' %}?appointment=${id}`)
+    .then(r => r.json())
+    .then(d => {
+      document.getElementById('details-patient-name').textContent = d.patient_name || '—';
+      document.getElementById('patient-name').textContent = d.patient_name || '—';
+      document.getElementById('patient-age').textContent = `${d.age_years||0} y/${d.age_months||0} m`;
+      document.getElementById('patient-gender').textContent = d.gender||'—';
+      document.getElementById('patient-source').textContent = src;
+    })
+    .catch(clearInfo);
+}
+
+function handlePatientSelection(sel, src) {
+  if (!sel.value) return;
+  const key = (src === 'Queued') ? 'appointment' : 'completed_patient';
+  window.location.href = `{% url 'prescribe_patient' %}?${key}=${encodeURIComponent(sel.value)}`;
+}
+
+document.addEventListener('DOMContentLoaded', () => {
+  // 1️⃣ TomSelect for notes/history fields
+  ['notes_history','notes_symptoms','notes_findings','general_advice'].forEach(f => {
+    const el = document.getElementById('id_' + f);
+    if (el && !el.tomselect) {
+      const ts = new TomSelect(el, {
+        create: true,
+        maxItems: null,
+        plugins: ['remove_button'],
+        hideSelected: true,
+        persist: false
+      });
+      if (el.value) ts.setValue(el.value.split(',').map(v => v.trim()));
+    }
+  });
+
+  // 2️⃣ Bind autocomplete to all existing drug‐name inputs
+  document.querySelectorAll('input[name$="-drug_name"]').forEach(input => {
+    $(input).autocomplete({
+      source: "{% url 'drug_autocomplete' %}",
+      minLength: 2,
+      select: function(_, ui) {
+        const row = this.closest('tr');
+        const comp = row.querySelector('textarea[name$="-composition"], input[name$="-composition"]');
+        if (comp) comp.value = ui.item.composition;
+      }
+    });
+  });
+
+  // 3️⃣ “Add Item” handler
+  const formCount = document.querySelector('input[name="details-TOTAL_FORMS"]');
+  const tableBody = document.querySelector('#drug-table tbody');
+  const emptyForm = document.getElementById('empty-form');
+  document.getElementById('add-row').addEventListener('click', e => {
+    e.preventDefault();
+    const idx = parseInt(formCount.value, 10);
+    const clone = emptyForm.cloneNode(true);
+    clone.removeAttribute('id'); clone.style.display = '';
+    clone.querySelectorAll('input, select, textarea').forEach(el => {
+      el.name = el.name.replace(/details-0-/, `details-${idx}-`);
+      el.id   = 'id_' + el.name;
+      if (el.tagName==='INPUT' || el.tagName==='TEXTAREA') el.value = '';
+    });
+    tableBody.appendChild(clone);
+    formCount.value = idx + 1;
+
+    // ✅ Wire up autocomplete for the new drug_name input
+    const newInput = clone.querySelector('input[name$="-drug_name"]');
+    if (newInput) {
+      $(newInput).autocomplete({
+        source: "{% url 'drug_autocomplete' %}",
+        minLength: 2,
+        select: function(_, ui) {
+          const row = this.closest('tr');
+          const comp = row.querySelector('textarea[name$="-composition"], input[name$="-composition"]');
+          if (comp) comp.value = ui.item.composition;
+        }
+      });
+    }
+  });
+
+  // 4️⃣ Keep patient selection when starting a new prescription
+  document.getElementById('new-prescription')?.addEventListener('click', () => {
+    const formEl = document.querySelector('form');
+
+    // Save the current patient selection
+    const queuedSel = document.getElementById('patient-queue');
+    const completedSel = document.getElementById('patient-completed');
+    const queuedVal = queuedSel ? queuedSel.value : '';
+    const completedVal = completedSel ? completedSel.value : '';
+
+    // Reset the form
+    formEl.reset();
+
+    // Restore patient selection
+    if (queuedSel && queuedVal) queuedSel.value = queuedVal;
+    if (completedSel && completedVal) completedSel.value = completedVal;
+
+    // Keep patient details intact and clear only prescription-specific fields
+    const rows = tableBody.querySelectorAll('tr.drug-row');
+    rows.forEach((r, i) => {
+      if (i > 0) {
+        r.remove();
+      } else {
+        r.querySelectorAll('input, select, textarea').forEach(el => el.value = '');
+      }
+    });
+    document.querySelector('input[name="details-TOTAL_FORMS"]').value = 1;
+
+    // Clear TomSelect fields
+    ['notes_history','notes_symptoms','notes_findings','general_advice'].forEach(f => {
+      const el = document.getElementById('id_' + f);
+      if (el && el.tomselect) el.tomselect.clear();
+    });
+  });
+
+  // 5️⃣ Dropdown change events
+  document.getElementById('patient-queue')?.addEventListener('change', function() {
+    handlePatientSelection(this, 'Queued');
+  });
+  document.getElementById('patient-completed')?.addEventListener('change', function() {
+    handlePatientSelection(this, 'Completed');
+  });
+});
+</script>

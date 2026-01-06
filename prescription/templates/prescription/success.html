@@ -1,0 +1,14 @@
+{% extends 'base_sidebar.html' %}
+
+{% block content %}
+<div class="container mt-5">
+  <div class="card shadow-sm mx-auto" style="max-width: 500px;">
+    <div class="card-body text-center">
+      <div class="display-1 text-success">✔️</div>
+      <h2 class="card-title mt-3">Prescription Saved</h2>
+      <p class="card-text mb-4">Your prescription has been successfully recorded.</p>
+      <a href="{% url 'prescribe_patient' %}" class="btn btn-primary">Back to Prescribe</a>
+    </div>
+  </div>
+</div>
+{% endblock %}

@@ -1,0 +1,318 @@
+{% extends 'base_sidebar.html' %}
+{% load static core_filters %}
+{% block title %}Write Prescription{% endblock %}
+
+{% block extra_head %}
+<link href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.10.5/font/bootstrap-icons.css" rel="stylesheet">
+<link href="https://code.jquery.com/ui/1.13.2/themes/base/jquery-ui.css" rel="stylesheet">
+<link href="https://cdn.jsdelivr.net/npm/tom-select@2.2.2/dist/css/tom-select.default.css" rel="stylesheet">
+<script src="https://code.jquery.com/jquery-3.6.0.min.js"></script>
+<script src="https://code.jquery.com/ui/1.13.2/jquery-ui.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/tom-select@2.2.2/dist/js/tom-select.complete.min.js"></script>
+<style>
+*, *::before, *::after { box-sizing: border-box; }
+.navbar-text.h5 { position: absolute; left: 50%; transform: translateX(-50%); }
+
+  .rx-notes textarea { min-height: 6rem; } /* ~rows=4 */
+
+</style>
+
+{% endblock %}
+
+{% block page_title %}
+  <i class="bi bi-prescription"></i> New Prescription
+{% endblock %}
+
+{% block content %}
+<div class="container-fluid mt-4">
+{% block extra_js %}
+<script>
+  window.SAVE_RX_TEMPLATE_URL = "{% url 'save_rx_template' %}";
+  window.APPLY_RX_TEMPLATE_URL = "{% url 'apply_rx_template' %}";   
+  window.RX_TEMPLATES_LIST_URL = "{% url 'rx_templates_list' %}";   
+</script>
+<script src="{% static 'prescription/prescription_save_template.js' %}"></script>
+{% endblock %}
+
+
+  <!-- Doctor-only buttons -->
+  <!-- Actions / Template toolbar -->
+<div class="d-flex flex-wrap align-items-center justify-content-between gap-2 mb-4">
+
+  <!-- Left: actions -->
+  <div class="btn-toolbar gap-2">
+    <a href="{% url 'lib_add_drug' %}?next={% url 'prescription' %}" class="btn btn-outline-primary"
+       title="Add a new drug to the library">
+      <i class="bi bi-book me-1"></i> Add Drug
+    </a>
+    
+
+    <button type="button" class="btn btn-outline-secondary" data-bs-toggle="modal" data-bs-target="#saveAsTemplateModal"
+            title="Save current items as a reusable template">
+      <i class="bi bi-stars me-1"></i> Save as Template
+    </button>
+    <!-- ▼ NEW: Vitals dropdown -->
+    <div class="btn-group">
+      <button type="button" class="btn btn-outline-secondary dropdown-toggle"
+              data-bs-toggle="dropdown" data-bs-auto-close="outside" aria-expanded="false">
+        <i class="bi bi-activity me-1"></i> Vitals
+      </button>
+      <div id="vitals-dropdown" class="dropdown-menu dropdown-menu-end p-3 shadow" 
+        style="min-width:360px;max-width:420px;">
+
+        {% if latest_vitals %}
+          <div class="small text-muted mb-2">
+            Recorded {{ latest_vitals.recorded_at|date:"M d, Y H:i" }}
+            {% if latest_vitals.recorded_by %} by {{ latest_vitals.recorded_by.user_name|default:"staff" }}{% endif %}
+          </div>
+          <div class="row g-2">
+            <div class="col-6"><strong>Height</strong><br>{{ latest_vitals.height_cm }} cm</div>
+            <div class="col-6"><strong>Weight</strong><br>{{ latest_vitals.weight_kg }} kg</div>
+            <div class="col-6"><strong>BMI</strong><br>{{ latest_vitals.bmi|floatformat:2 }}</div>
+            <div class="col-6"><strong>Temp</strong><br>{{ latest_vitals.temperature_c|floatformat:1 }} °C</div>
+            <div class="col-6"><strong>BP</strong><br>{{ latest_vitals.bp_systolic }}/{{ latest_vitals.bp_diastolic }} mmHg</div>
+            <div class="col-6"><strong>SpO₂</strong><br>{{ latest_vitals.spo2_percent }} %</div>
+            <div class="col-6"><strong>Pulse</strong><br>{{ latest_vitals.pulse_bpm|default:"—" }} bpm</div>
+            {% if latest_vitals.notes %}
+              <div class="col-12"><strong>Notes</strong><br>{{ latest_vitals.notes }}</div>
+            {% endif %}
+          </div>
+        {% else %}
+          <p class="mb-2 text-muted">No vitals recorded yet.</p>
+        {% endif %}
+        <div class="mt-3 d-flex justify-content-end">
+          {% if vitals_url %}
+            <a class="btn btn-sm btn-outline-primary"
+              href="{{ vitals_url }}?next={{ request.get_full_path|urlencode }}">
+              Add / Edit Vitals
+            </a>
+          {% endif %}
+        </div>
+      </div>
+    </div>
+  </div>
+  
+
+  <!-- Right: template picker -->
+  <div class="d-flex align-items-end gap-2">
+    <div class="w-100" style="max-width: 420px;">
+      <label for="rx-template-select" class="form-label mb-1">
+        <i class="bi bi-magic me-1"></i> Template
+      </label>
+      <div class="input-group input-group-sm">
+        <select id="rx-template-select" class="form-select">
+          <option value="">Search or select a template…</option>
+        </select>
+        <button type="button" id="btn-apply-template" class="btn btn-secondary" disabled>Apply</button>
+      </div>
+      <div class="form-text">Selecting a template will append its medicines to your list.</div>
+    </div>
+  </div>
+
+</div>
+
+
+
+  {% if messages %}
+    {% for message in messages %}
+      <div class="alert alert-{{ message.tags }}">{{ message }}</div>
+
+    {% endfor %}
+  {% endif %}
+  <form id="prescription-form" method="post" novalidate autocomplete="off">
+  {% csrf_token %}
+
+  <!-- Nav Tabs -->
+  <ul class="nav nav-tabs mb-3" id="rxTabs" role="tablist">
+  <li class="nav-item" role="presentation">
+    <button class="nav-link active" id="tab-patient-tab" data-bs-toggle="tab" data-bs-target="#tab-patient" type="button" role="tab">
+      <i class="bi bi-person-lines-fill me-1"></i> Patient Info
+    </button>
+  </li>
+  <li class="nav-item" role="presentation">
+    <button class="nav-link" id="tab-notes-tab" data-bs-toggle="tab" data-bs-target="#tab-notes" type="button" role="tab">
+      <i class="bi bi-journal-text me-1"></i> Clinical Notes
+      <span id="tab-notes-patient" class="text-muted small"></span>
+    </button>
+  </li>
+  <li class="nav-item" role="presentation">
+    <button class="nav-link" id="tab-drugs-tab" data-bs-toggle="tab" data-bs-target="#tab-drugs" type="button" role="tab">
+      <i class="bi bi-prescription2 me-1"></i> Prescription
+      <span id="tab-drugs-patient" class="text-muted small"></span>
+    </button>
+  </li>
+</ul>
+
+  <!-- Tab Panes -->
+  <div class="tab-content" id="rxTabsContent">
+
+    <!-- 🔹 Patient Info -->
+    <div class="tab-pane fade show active" id="tab-patient" role="tabpanel">
+      <div class="card mb-4">
+        <div class="card-header bg-light fw-semibold"><i class="bi bi-person-vcard me-1"></i> Patient Selection</div>
+        <div class="card-body">
+          <div class="row g-3">
+            <div class="col-md-6">
+              <label>{{ prescription_form.appointment.label }}</label>
+              {{ prescription_form.appointment }}
+              {{ prescription_form.appointment.errors }}
+            </div>
+            <div class="col-md-6">
+              <label>{{ prescription_form.completed_patient.label }}</label>
+              {{ prescription_form.completed_patient }}
+              {{ prescription_form.completed_patient.errors }}
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <div class="card mb-4">
+        <div class="card-header bg-success text-white fw-semibold">
+          <i class="bi bi-person me-1"></i> Patient Details
+        </div>
+        <div class="card-body">
+          <div class="row g-3">
+            <div class="col-md-4"><strong>Name:</strong> {{ patient_info.name|default:"—" }}</div>
+            <div class="col-md-4"><strong>Age:</strong> {{ patient_info.age_years }}y/{{ patient_info.age_months }}m</div>
+            <div class="col-md-4"><strong>Gender:</strong> {{ patient_info.gender|default:"—" }}</div>
+          </div>
+          {% if latest_vitals %}
+            <hr>
+            <div class="row g-2 small">
+              <div class="col-6"><strong>BP:</strong> {{ latest_vitals.bp_systolic }}/{{ latest_vitals.bp_diastolic }}</div>
+              <div class="col-6"><strong>Pulse:</strong> {{ latest_vitals.pulse_bpm }}</div>
+              <div class="col-6"><strong>Temp:</strong> {{ latest_vitals.temperature_c }} °C</div>
+              <div class="col-6"><strong>SpO₂:</strong> {{ latest_vitals.spo2_percent }} %</div>
+            </div>
+          {% endif %}
+        </div>
+      </div>
+    </div>
+
+    <!-- 🔹 Clinical Notes -->
+    <div class="tab-pane fade" id="tab-notes" role="tabpanel">
+      <div class="card mb-4">
+        <div class="card-header bg-primary text-white fw-semibold">
+          <i class="bi bi-journal-medical me-1"></i> Clinical Notes
+        </div>
+        <div class="card-body">
+          <div class="row g-3">
+            <div class="col-md-6">
+              {{ prescription_form.notes_history.label_tag }}
+              {{ prescription_form.notes_history|add_attr:"rows=4" }}
+              {{ prescription_form.notes_history.errors }}
+            </div>
+            <div class="col-md-6">
+              {{ prescription_form.notes_symptoms.label_tag }}
+              {{ prescription_form.notes_symptoms|add_attr:"rows=4" }}
+              {{ prescription_form.notes_symptoms.errors }}
+            </div>
+            <div class="col-md-6">
+              {{ prescription_form.notes_findings.label_tag }}
+              {{ prescription_form.notes_findings|add_attr:"rows=4" }}
+              {{ prescription_form.notes_findings.errors }}
+            </div>
+            <div class="col-md-6">
+              {{ prescription_form.general_advice.label_tag }}
+              {{ prescription_form.general_advice|add_attr:"rows=4" }}
+              {{ prescription_form.general_advice.errors }}
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- 🔹 Prescription Tab -->
+    <div class="tab-pane fade" id="tab-drugs" role="tabpanel">
+      <div class="card mb-4">
+        <div class="card-header bg-info text-white fw-semibold d-flex justify-content-between align-items-center">
+          <span><i class="bi bi-capsule me-1"></i> Prescription Details</span>
+          <button type="button" id="add-row" class="btn btn-light btn-sm">+ Add Drug</button>
+        </div>
+        <div class="card-body">
+          {{ detailformset.management_form }}
+          <table class="table table-bordered" id="drug-table">
+            <thead class="table-light">
+              <tr>
+                <th>Drug</th><th>Composition</th><th>Dosage</th><th>Frequency</th>
+                <th>Duration</th><th>Food</th><th></th>
+              </tr>
+            </thead>
+            <tbody>
+              {% for form in detailformset.forms %}
+              <tr class="drug-row">
+                {{ form.id }}
+                <td>{{ form.drug_name }}</td>
+                <td>{{ form.composition }}</td>
+                <td>{{ form.dosage }}</td>
+                <td>{{ form.frequency }}</td>
+                <td>{{ form.duration }}</td>
+                <td>{{ form.food_order }}</td>
+                <td class="text-center">
+                  {{ form.DELETE }}
+                  <button type="button" class="btn btn-outline-danger btn-sm" onclick="this.closest('tr').remove()">
+                    <i class="bi bi-trash"></i>
+                  </button>
+                </td>
+              </tr>
+              {% endfor %}
+            </tbody>
+          </table>
+        </div>
+      </div>
+    </div>
+
+  </div> <!-- /tab-content -->
+
+  <!-- 🔹 Save Buttons -->
+  <div class="d-flex justify-content-end gap-2 mt-3 sticky-bottom bg-white p-2 border-top">
+    <button type="submit" name="action" value="save" class="btn btn-primary">
+      <i class="bi bi-save me-1"></i> Save
+    </button>
+    <button type="submit" name="action" value="save_print" class="btn btn-outline-primary">
+      <i class="bi bi-printer me-1"></i> Save &amp; Print
+    </button>
+  </div>
+</form>
+  
+
+
+   <div class="d-flex flex-wrap justify-content-end gap-2 mt-3">
+  <button type="submit" name="action" value="save" class="btn btn-primary">Save Prescription</button>
+  <button type="submit" name="action" value="save_print" class="btn btn-outline-primary">Save &amp; View/Print</button>
+</div>
+
+
+  </form>
+  <div class="modal fade" id="saveAsTemplateModal" tabindex="-1" aria-hidden="true">
+  <div class="modal-dialog modal-dialog-centered">
+    <div class="modal-content">
+      <div class="modal-header">
+        <h6 class="modal-title">Save as Prescription Template</h6>
+        <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+      </div>
+      <div class="modal-body">
+        <label for="tmplName" class="form-label">Template Name</label>
+        <input type="text" class="form-control" id="tmplName" placeholder="e.g., Viral Fever – Adults">
+        <div id="tmplErr" class="text-danger small mt-2 d-none"></div>
+        <div class="form-text mt-2">All current drug rows will be saved into this template.</div>
+      </div>
+      <div class="modal-footer">
+        <button class="btn btn-light" data-bs-dismiss="modal">Cancel</button>
+        <button id="confirmSaveTemplate" class="btn btn-success" type="button">Save Template</button>
+        </div>
+      </div>
+    </div>
+  </div>
+
+</div>
+<script>
+document.addEventListener("DOMContentLoaded", function () {
+    Autosave.init();
+});
+</script>
+
+
+{% include 'prescription/prescription_scripts.html' %}
+
+{% endblock %}

@@ -1,0 +1,304 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<title>Prescription – {{ master.patient.patient_name }}</title>
+
+<style>
+    body {
+        font-family: "Segoe UI", Arial, sans-serif;
+        font-size: 14px;
+        margin: 40px;
+        color: #222;
+        line-height: 1.45;
+    }
+
+    /* ===== HEADER ===== */
+    .header {
+        text-align: center;
+        padding-bottom: 10px;
+        margin-bottom: 25px;
+        border-bottom: 2px solid #0a4d8c;
+    }
+
+    .header h2 {
+        margin: 0;
+        font-size: 26px;
+        letter-spacing: 0.5px;
+        color: #0a4d8c;
+        font-weight: 600;
+    }
+    .sub-heading {
+        font-size: 12px;
+        color: #444;
+        margin-top: 5px;
+        line-height: 1.3;
+    }
+
+    /* ===== BOX / SECTION STANDARD ===== */
+    .box {
+        border: 1px solid #ddd;
+        background: #fafafa;
+        padding: 14px 18px;
+        border-radius: 8px;
+        margin-bottom: 18px;
+    }
+
+    .section-title {
+        font-weight: 600;
+        font-size: 16px;
+        margin-bottom: 10px;
+        color: #0a4d8c;
+        border-left: 4px solid #0a4d8c;
+        padding-left: 8px;
+    }
+
+    /* ===== 3 COLUMN GRID FOR NOTES ===== */
+    .notes-grid {
+        display: grid;
+        grid-template-columns: repeat(3, 1fr);
+        gap: 12px;
+    }
+
+    .note-card {
+        background: #fff;
+        border: 1px solid #ddd;
+        padding: 10px 12px;
+        border-radius: 6px;
+        min-height: 140px;
+    }
+
+    .note-card h4 {
+        margin: 0 0 6px;
+        font-size: 14px;
+        font-weight: 600;
+        color: #0a4d8c;
+        border-bottom: 1px solid #eee;
+        padding-bottom: 4px;
+    }
+
+    .note-text {
+        font-size: 13px;
+        color: #333;
+    }
+
+    /* Mobile fallback */
+    @media (max-width: 768px) {
+        .notes-grid {
+            grid-template-columns: 1fr;
+        }
+    }
+
+    /* ===== DRUG TABLE ===== */
+    .drug-table {
+        width: 100%;
+        border-collapse: separate;
+        border-spacing: 0 6px;
+        margin-top: 10px;
+        font-size: 14px;
+    }
+
+    .drug-table th {
+        text-align: left;
+        padding: 8px;
+        font-size: 13px;
+        background: #e8f1fb;
+        color: #0a4d8c;
+    }
+
+    .drug-row {
+        background: #fff;
+        border: 1px solid #ccc;
+    }
+
+    .drug-row td {
+        padding: 8px;
+        border-right: 1px solid #eee;
+    }
+    .drug-row td:last-child {
+        border-right: none;
+    }
+
+    .rx-symbol {
+        font-size: 40px;
+        color: #0a4d8c;
+        font-weight: bold;
+        margin-bottom: -10px;
+    }
+
+    /* ===== SIGNATURE ===== */
+    .signature-block {
+        margin-top: 40px;
+        text-align: right;
+        padding-right: 20px;
+    }
+    .signature-name {
+        font-size: 16px;
+        font-weight: bold;
+    }
+    .signature-line {
+        width: 220px;
+        margin-left: auto;
+        border-bottom: 1px solid #333;
+        margin-top: 30px;
+    }
+
+    /* Print Optimizations */
+    @media print {
+        .no-print { display: none !important; }
+        body { margin: 20px; }
+    }
+</style>
+
+</head>
+
+<body>
+
+<!-- HEADER -->
+<div class="header">
+    <h2>{{ master.hospital.name }}</h2>
+    <div class="sub-heading">
+        {{ master.hospital.address }}<br>
+        Phone: {{ master.hospital.mobile }} | Email: {{ master.hospital.email }}
+    </div>
+</div>
+
+<!-- PATIENT BOX -->
+<div class="patient-box">
+    <div class="row">
+        <div class="col"><strong>Patient:</strong> {{ master.patient.patient_name }}</div>
+        <div class="col"><strong>Age:</strong> {{ master.patient.age_years }}y {{ master.patient.age_months }}m</div>
+        <div class="col"><strong>Gender:</strong> {{ master.patient.gender }}</div>
+    </div>
+    <div class="row">
+        <div class="col"><strong>Date:</strong> {{ master.prescribed_on|date:"d M Y" }}</div>
+        <div class="col"><strong>Doctor:</strong> Dr. {{ master.doctor.doctor_name }}</div>
+
+        <div class="col">
+            <strong>Appointment #:</strong>
+            {% if master.appointment %}
+                {{ master.appointment.token_number }}
+            {% else %}
+                —
+            {% endif %}
+        </div>
+    </div>
+</div>
+
+
+<!-- CLINICAL NOTES -->
+<div class="box">
+    <div class="section-title">Clinical Notes</div>
+
+    <div class="notes-grid">
+
+        {% if master.notes_history %}
+        <div class="note-card">
+            <h4>History</h4>
+            <div class="note-text">{{ master.notes_history|linebreaks }}</div>
+        </div>
+        {% endif %}
+
+        {% if master.notes_symptoms %}
+        <div class="note-card">
+            <h4>Symptoms</h4>
+            <div class="note-text">{{ master.notes_symptoms|linebreaks }}</div>
+        </div>
+        {% endif %}
+
+        {% if master.notes_findings %}
+        <div class="note-card">
+            <h4>Findings</h4>
+            <div class="note-text">{{ master.notes_findings|linebreaks }}</div>
+        </div>
+        {% endif %}
+
+    </div>
+
+    {% if master.diagnosis %}
+    <div style="margin-top: 18px;">
+        <h4 style="color:#0a4d8c; margin-bottom:4px;">Diagnosis</h4>
+        <div class="note-text">{{ master.diagnosis|linebreaks }}</div>
+    </div>
+    {% endif %}
+</div>
+
+<!-- RX -->
+<div class="box">
+    <div class="section-title">Prescription</div>
+
+    <div class="rx-symbol">℞</div>
+
+    <table class="drug-table">
+        <thead>
+            <tr>
+                <th>Drug</th>
+                <th>Dosage</th>
+                <th>Frequency</th>
+                <th>Duration</th>
+                <th>Food</th>
+            </tr>
+        </thead>
+
+        <tbody>
+        {% for d in details %}
+        <tr class="drug-row">
+            <td>
+                <strong>{{ d.drug_name }}</strong><br>
+                {% if d.composition %}<small>{{ d.composition }}</small>{% endif %}
+            </td>
+            <td>{{ d.dosage }}</td>
+            <td>{{ d.frequency }}</td>
+            <td>{{ d.duration }}</td>
+            <td>{{ d.food_order }}</td>
+        </tr>
+        {% endfor %}
+        </tbody>
+    </table>
+</div>
+
+<!-- ADVICE -->
+{% if master.general_advice %}
+<div class="section">
+    <div class="section-title">General Advice</div>
+    {{ master.general_advice|linebreaks }}
+</div>
+{% endif %}
+
+<!-- SIGNATURE -->
+<div class="signature-block">
+    <div class="signature-line"></div>
+    <div class="signature-name">Dr. {{ master.doctor.doctor_name }}</div>
+    <div>{{ master.doctor.qualification }}</div>
+    <div>{{ master.doctor.registration_number }}</div>
+</div>
+
+
+<!-- PRINT BUTTON -->
+<div class="no-print" style="margin-top: 20px; display:flex; gap:12px;">
+    
+    <!-- BACK BUTTON -->
+    <div style="margin-bottom: 10pt;">
+    {% if request.user.role.role_name == "doctor" %}
+        <a href="{% url 'doctor_dashboard' %}" class="btn btn-sm btn-outline-secondary">
+        ← Back to Dashboard
+        </a>
+    {% else %}
+        <a href="{% url 'prescription:view_prescriptions' %}" class="btn btn-sm btn-outline-secondary">
+        ← Back to Prescriptions
+        </a>
+    {% endif %}
+    </div>
+
+
+    <!-- PRINT BUTTON -->
+    <button onclick="window.print()" 
+            style="padding: 8px 16px; font-size: 16px;">
+        Print Prescription
+    </button>
+
+</div>
+
+
+</body>
+</html>

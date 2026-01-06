@@ -1,0 +1,557 @@
+{% extends "prescription/ai/base_ai_wizard.html" %}
+{% load core_filters %}
+{% load static %}
+
+{% block title %}Manual Prescription{% endblock %}
+
+{% block step_title %}Step 5 · Prescription (Manual){% endblock %}
+{% block step_subtitle %}
+AI is disabled for this hospital. Please enter prescription manually.
+{% endblock %}
+
+{% block step_content %}
+
+<link href="https://code.jquery.com/ui/1.13.2/themes/base/jquery-ui.css" rel="stylesheet">
+<script src="https://code.jquery.com/jquery-3.6.0.min.js"></script>
+<script src="https://code.jquery.com/ui/1.13.2/jquery-ui.min.js"></script>
+
+<style>
+#drug-table input.form-control {
+    height: 32px;
+    font-size: 14px;
+    padding: 2px 6px;
+}
+.preset-title {
+    font-size: 12px;
+    padding: 3px 10px;
+    opacity: 0.6;
+}
+</style>
+
+<!-- Modal: Add New Drug -->
+<div class="modal fade" id="addDrugModal" tabindex="-1">
+  <div class="modal-dialog">
+    <div class="modal-content">
+
+      <div class="modal-header">
+        <h5 class="modal-title">Add New Drug</h5>
+        <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+      </div>
+
+      <div class="modal-body">
+
+        <div class="mb-3">
+          <label class="form-label">Drug Name</label>
+          <input id="newDrugName" class="form-control">
+        </div>
+
+        <div class="mb-3">
+          <label class="form-label">Generic Name / Composition *</label>
+          <input id="newDrugComposition" class="form-control">
+        </div>
+
+      </div>
+
+      <div class="modal-footer">
+        <button id="saveDrugBtn" type="button" class="btn btn-primary">Save Drug</button>
+      </div>
+
+    </div>
+  </div>
+</div>
+
+
+
+<form method="post" autocomplete="off" novalidate>
+  {% csrf_token %}
+
+  <!-- Patient Box -->
+  <div class="card mb-3 shadow-sm">
+    <div class="card-body">
+      <h5 class="mb-1">{{ patient.patient_name }}</h5>
+      <div class="text-muted small">
+        Age: {{ patient.age_years }}y {{ patient.age_months }}m · {{ patient.gender }}
+      </div>
+    </div>
+  </div>
+
+<!-- GENERAL ADVICE -->
+  <div class="card shadow-sm mb-3">
+    <div class="card-header"><strong>General Advice</strong></div>
+    <div class="card-body">
+        <textarea name="general_advice" class="form-control" rows="2"
+                  placeholder="Enter general advice here...">{{ form.initial.general_advice }}</textarea>
+    </div>
+  </div>
+
+<!-- =========================
+     DRUG TABLE
+========================= -->
+  <div class="card shadow-sm">
+    <div class="card-header d-flex justify-content-between align-items-center">
+      <strong>Prescription Items</strong>
+      <button type="button" class="btn btn-sm btn-outline-primary" id="add-row">+ Add Item</button>
+    </div>
+
+    <div class="card-body">
+
+      {{ formset.management_form }}
+
+      <table class="table table-bordered table-sm" id="drug-table">
+        <thead class="table-light">
+          <tr>
+            <th>Drug</th>
+            <th>Dosage</th>
+            <th>Frequency</th>
+            <th>Duration</th>
+            <th>Food</th>
+            <th style="width:40px;"></th>
+          </tr>
+        </thead>
+
+        <tbody>
+        {% for form in formset %}
+        <tr class="drug-row align-middle">
+
+          <td style="display:none;">
+            {{ form.id }}
+            {{ form.DELETE }}
+          </td>
+
+          <td style="min-width: 220px;">
+            <div class="input-group input-group-sm">
+              {{ form.drug_name|add_attr:"class=form-control drug-input" }}
+              {{ form.composition|add_attr:"class=d-none" }}
+              <button type="button" class="btn btn-outline-secondary add-drug-btn">+</button>
+            </div>
+          </td>
+
+          <td style="min-width:130px;">
+            <div class="input-group input-group-sm">
+              {{ form.dosage|add_attr:"class=form-control dosage-input"|add_attr:"autocomplete=off" }}
+              <button type="button" class="btn btn-outline-secondary dropdown-toggle" data-bs-toggle="dropdown"></button>
+              <ul class="dropdown-menu">
+                <li class="preset-title px-3">Dosage presets</li>
+                <li><a class="dropdown-item dosage-option" data-value="Tablet">Tablet</a></li>
+                <li><a class="dropdown-item dosage-option" data-value="Capsule">Capsule</a></li>
+                <li><a class="dropdown-item dosage-option" data-value="Syrup">Syrup</a></li>
+                <li><a class="dropdown-item dosage-option" data-value="Injection">Injection</a></li>
+              </ul>
+            </div>
+          </td>
+
+          <td style="min-width:150px;">
+            <div class="input-group input-group-sm dropdown">
+              {{ form.frequency|add_attr:"class=form-control frequency-input"|add_attr:"autocomplete=nope" }}
+              <button type="button" class="btn btn-outline-secondary dropdown-toggle" data-bs-toggle="dropdown"></button>
+              <ul class="dropdown-menu frequency-menu"></ul>
+            </div>
+          </td>
+
+          <td style="min-width:140px;">
+            <div class="input-group input-group-sm dropdown">
+              {{ form.duration|add_attr:"class=form-control duration-input"|add_attr:"autocomplete=nope" }}
+              <button type="button" class="btn btn-outline-secondary dropdown-toggle" data-bs-toggle="dropdown"></button>
+              <ul class="dropdown-menu duration-menu"></ul>
+            </div>
+          </td>
+
+          <td style="min-width:140px;">
+            <div class="input-group input-group-sm dropdown">
+              {{ form.food_order|add_attr:"class=form-control food-input"|add_attr:"autocomplete=nope" }}
+              <button type="button" class="btn btn-outline-secondary dropdown-toggle" data-bs-toggle="dropdown"></button>
+              <ul class="dropdown-menu food-menu"></ul>
+            </div>
+          </td>
+
+          <td class="text-center">
+            <button type="button" class="btn btn-sm btn-outline-danger delete-row-btn">
+              <i class="bi bi-trash"></i>
+            </button>
+          </td>
+
+        </tr>
+        {% endfor %}
+        </tbody>
+      </table>
+
+    </div>
+  </div>
+
+
+<!-- EMPTY FORM TEMPLATE -->
+<template id="details-empty-form">
+<tr class="drug-row align-middle">
+
+  <td style="display:none;">
+    {{ formset.empty_form.id }}
+    {{ formset.empty_form.DELETE }}
+  </td>
+
+  <td style="min-width: 220px;">
+    <div class="input-group input-group-sm">
+      {{ formset.empty_form.drug_name|add_attr:"class=form-control drug-input" }}
+      {{ formset.empty_form.composition|add_attr:"class=d-none" }}
+      <button type="button" class="btn btn-outline-secondary add-drug-btn">+</button>
+    </div>
+  </td>
+
+  <td style="min-width:130px;">
+    <div class="input-group input-group-sm">
+      {{ formset.empty_form.dosage|add_attr:"class=form-control dosage-input"|add_attr:"autocomplete=off" }}
+      <button type="button" class="btn btn-outline-secondary dropdown-toggle" data-bs-toggle="dropdown"></button>
+      <ul class="dropdown-menu">
+        <li><a class="dropdown-item dosage-option" data-value="Tablet">Tablet</a></li>
+        <li><a class="dropdown-item dosage-option" data-value="Capsule">Capsule</a></li>
+        <li><a class="dropdown-item dosage-option" data-value="Syrup">Syrup</a></li>
+        <li><a class="dropdown-item dosage-option" data-value="Injection">Injection</a></li>
+      </ul>
+    </div>
+  </td>
+
+  <td style="min-width:150px;">
+    <div class="input-group input-group-sm dropdown">
+      {{ formset.empty_form.frequency|add_attr:"class=form-control frequency-input"|add_attr:"autocomplete=nope" }}
+      <button type="button" class="btn btn-outline-secondary dropdown-toggle" data-bs-toggle="dropdown"></button>
+      <ul class="dropdown-menu frequency-menu"></ul>
+    </div>
+  </td>
+
+  <td style="min-width:140px;">
+    <div class="input-group input-group-sm dropdown">
+      {{ formset.empty_form.duration|add_attr:"class=form-control duration-input"|add_attr:"autocomplete=nope" }}
+      <button type="button" class="btn btn-outline-secondary dropdown-toggle" data-bs-toggle="dropdown"></button>
+      <ul class="dropdown-menu duration-menu"></ul>
+    </div>
+  </td>
+
+  <td style="min-width:140px;">
+    <div class="input-group input-group-sm dropdown">
+      {{ formset.empty_form.food_order|add_attr:"class=form-control food-input"|add_attr:"autocomplete=nope" }}
+      <button type="button" class="btn btn-outline-secondary dropdown-toggle" data-bs-toggle="dropdown"></button>
+      <ul class="dropdown-menu food-menu"></ul>
+    </div>
+  </td>
+
+  <td class="text-center">
+    <button type="button" class="btn btn-sm btn-outline-danger delete-row-btn">
+      <i class="bi bi-trash"></i>
+    </button>
+  </td>
+
+</tr>
+</template>
+
+
+<div class="d-flex justify-content-between mt-4">
+  <a href="{% url 'ai_rx_diagnosis' draft.id %}" class="btn btn-outline-secondary">← Back</a>
+  <button type="submit" class="btn btn-success">Continue → Review</button>
+</div>
+
+</form>
+
+
+<!-- =========================
+     JAVASCRIPT
+========================= -->
+<script>
+document.addEventListener("DOMContentLoaded", function () {
+
+    let activeDrugInput = null;
+
+    const FREQUENCY_PRESETS = [
+        "OD (Once Daily)", "BD (Twice Daily)", "TDS (Thrice Daily)",
+        "QID (4 Times Daily)", "HS (At Bedtime)",
+        "QAM (Every Morning)", "QPM (Every Evening)",
+        "Q6H (Every 6 Hours)", "Q8H (Every 8 Hours)", "PRN (As Needed)"
+    ];
+
+    const DURATION_PRESETS = [
+        "3 days","5 days","7 days","10 days","14 days","21 days","28 days",
+        "6 weeks","3 months","6 months"
+    ];
+
+    const FOOD_PRESETS = [
+        "Before Food (AC)", "After Food (PC)",
+        "With Food", "Empty Stomach", "Bedtime (HS)"
+    ];
+
+    function bindAutocomplete(input) {
+        $(input).autocomplete({
+            source: function (request, response) {
+                $.ajax({
+                    url: "{% url 'drug_autocomplete' %}",
+                    data: { term: request.term },
+                    success: function (data) {
+                        let results = data || [];
+                        const exists = results.some(
+                            it => (it.label || "").toLowerCase() === request.term.toLowerCase()
+                        );
+                        if (!exists) {
+                            results.push({
+                                label: "➕ Add new drug: " + request.term,
+                                value: request.term,
+                                add_new: true
+                            });
+                        }
+                        response(results);
+                    }
+                });
+            },
+            minLength: 2,
+            select: function (e, ui) {
+                if (ui.item.add_new) {
+                    e.preventDefault();
+                    activeDrugInput = this;
+                    document.getElementById("newDrugName").value = ui.item.value;
+                    document.getElementById("newDrugComposition").value = "";
+                    new bootstrap.Modal(document.getElementById("addDrugModal")).show();
+                    return false;
+                }
+                this.value = ui.item.label;
+                const row = this.closest("tr");
+                const comp = row.querySelector('input[name$="-composition"]');
+                if (comp) comp.value = ui.item.composition || "";
+            }
+        });
+    }
+
+    document.querySelectorAll('input[name$="-drug_name"]').forEach(bindAutocomplete);
+
+
+    function fillMenu(ul, presets, type) {
+        ul.innerHTML = "";
+        presets.forEach(val => {
+            const li = document.createElement("li");
+            const btn = document.createElement("button");
+            btn.type = "button";
+            btn.className = "dropdown-item preset-option";
+            btn.dataset.target = type;
+            btn.dataset.value = val;
+            btn.textContent = val;
+            li.appendChild(btn);
+            ul.appendChild(li);
+        });
+    }
+
+    function setupRowMenus(row) {
+        fillMenu(row.querySelector(".frequency-menu"), FREQUENCY_PRESETS, "frequency");
+        fillMenu(row.querySelector(".duration-menu"), DURATION_PRESETS, "duration");
+        fillMenu(row.querySelector(".food-menu"), FOOD_PRESETS, "food");
+    }
+
+    document.querySelectorAll("tr.drug-row").forEach(setupRowMenus);
+
+
+    // ADD ROW — correct Django formset logic
+    document.getElementById("add-row").addEventListener("click", function () {
+    const tbody = document.querySelector("#drug-table tbody");
+    const totalInput = document.querySelector('input[name="details-TOTAL_FORMS"]');
+    let index = parseInt(totalInput.value, 10);
+
+    const template = document.getElementById("details-empty-form");
+    let html = template.innerHTML.replace(/__prefix__/g, index);
+
+    tbody.insertAdjacentHTML("beforeend", html);
+    totalInput.value = index + 1;
+
+    const newRow = tbody.querySelector("tr.drug-row:last-child");
+    const drugInput = newRow.querySelector('input[name$="-drug_name"]');
+    if (drugInput) bindAutocomplete(drugInput);
+    setupRowMenus(newRow);
+    newRow.querySelectorAll('[data-bs-toggle="dropdown"]')
+          .forEach(btn => new bootstrap.Dropdown(btn));
+  });
+
+
+
+    // DELETE ROW — soft delete
+    document.addEventListener("click", function (e) {
+        const btn = e.target.closest(".delete-row-btn");
+        if (!btn) return;
+        const row = btn.closest("tr");
+        const del = row.querySelector('input[name$="-DELETE"]');
+        if (del) {
+            del.checked = true;
+            row.style.display = "none";
+        }
+    });
+
+
+    // SAVE NEW DRUG
+    document.getElementById("saveDrugBtn").addEventListener("click", function () {
+        const name = newDrugName.value.trim();
+        const comp = newDrugComposition.value.trim();
+
+        if (!name || !comp) {
+            alert("Both fields required.");
+            return;
+        }
+
+        const fd = new FormData();
+        fd.append("drug_name", name);
+        fd.append("composition", comp);
+
+        fetch("{% url 'ajax_add_drug' %}", {
+            method: "POST",
+            headers: { "X-CSRFToken": "{{ csrf_token }}" },
+            body: fd
+        })
+        .then(res => res.json())
+        .then(data => {
+            if (data.error) {
+                alert(data.error);
+                return;
+            }
+            if (activeDrugInput) {
+                activeDrugInput.value = data.text;
+                const row = activeDrugInput.closest("tr");
+                row.querySelector('input[name$="-composition"]').value = comp;
+            }
+            bootstrap.Modal.getInstance(document.getElementById("addDrugModal")).hide();
+        });
+    });
+
+
+    // DOSAGE PRESETS
+    document.addEventListener("click", function (e) {
+        if (!e.target.classList.contains("dosage-option")) return;
+
+        const row = e.target.closest("tr");
+        const input = row.querySelector('input[name$="-dosage"]');
+        const map = {
+            "Tablet": "1 tablet",
+            "Capsule": "1 capsule",
+            "Syrup": "5 ml syrup",
+            "Injection": "1 injection"
+        };
+        input.value = map[e.target.dataset.value] || "";
+    });
+
+
+    // FREQUENCY / DURATION / FOOD PRESETS
+    document.addEventListener("click", function (e) {
+        const btn = e.target.closest(".preset-option");
+        if (!btn) return;
+
+        const row = btn.closest("tr");
+        const type = btn.dataset.target;
+
+        let selector = {
+            "frequency": "input[name$='-frequency']",
+            "duration":  "input[name$='-duration']",
+            "food":      "input[name$='-food_order']"
+        }[type];
+
+        if (selector) {
+            row.querySelector(selector).value = btn.dataset.value;
+        }
+    });
+
+});
+
+
+function autosaveDrugs() {
+    const payload = JSON.stringify(collectDrugRows());
+
+    fetch("{% url 'autosave_draft' draft.id %}", {
+        method: "POST",
+        headers: {
+            "X-CSRFToken": "{{ csrf_token }}",
+            "Content-Type": "application/x-www-form-urlencoded"
+        },
+        body: new URLSearchParams({
+            field: "drugs",
+            value: payload
+        })
+    });
+}
+
+// Trigger autosave when inputs change
+document.addEventListener("input", function (e) {
+    if (e.target.closest("#drug-table")) {
+        autosaveDrugs();
+    }
+});
+
+// Trigger autosave after presets / delete / add row
+document.addEventListener("click", function (e) {
+    if (
+        e.target.closest(".preset-option") ||
+        e.target.closest(".dosage-option") ||
+        e.target.closest(".delete-row-btn") ||
+        e.target.closest("#add-row")
+    ) {
+        setTimeout(autosaveDrugs, 50);
+    }
+});
+function collectDrugRows() {
+    const rows = [];
+    document.querySelectorAll("#drug-table tbody tr.drug-row").forEach(row => {
+        const del = row.querySelector('input[name$="-DELETE"]');
+        if (del && del.checked) return;
+
+        const getVal = (suffix) => {
+            const el = row.querySelector(`input[name$='-${suffix}']`);
+            return el ? el.value.trim() : "";
+        };
+
+        const drugName = getVal("drug_name");
+        if (!drugName) return;
+
+        rows.push({
+            drug_name: drugName,
+            composition: getVal("composition"),
+            dosage: getVal("dosage"),
+            frequency: getVal("frequency"),
+            duration: getVal("duration"),
+            food_order: getVal("food_order")
+        });
+    });
+    return rows;
+}
+
+function renderDrugRows(drugs) {
+    const tbody = document.querySelector("#drug-table tbody");
+    const totalInput = document.querySelector('input[name="details-TOTAL_FORMS"]');
+
+    tbody.innerHTML = "";
+    let index = 0;
+
+    drugs.forEach(d => {
+        const template = document.getElementById("details-empty-form").innerHTML;
+        const html = template.replace(/__prefix__/g, index);
+        tbody.insertAdjacentHTML("beforeend", html);
+
+        const row = tbody.querySelector("tr.drug-row:last-child");
+
+        const setVal = (suffix, val) => {
+            const el = row.querySelector(`input[name$='-${suffix}']`);
+            if (el) el.value = val || "";
+        };
+
+        setVal("drug_name", d.drug_name);
+        setVal("composition", d.composition);
+        setVal("dosage", d.dosage);
+        setVal("frequency", d.frequency);
+        setVal("duration", d.duration);
+        setVal("food_order", d.food_order);
+
+        bindAutocomplete(row.querySelector('input[name$="-drug_name"]'));
+        setupRowMenus(row);
+
+        index++;
+    });
+
+    totalInput.value = index;
+    autosaveDrugs();
+}
+document.addEventListener("DOMContentLoaded", function () {
+    Autosave.init();
+});
+</script>
+
+
+
+
+{% endblock %}
