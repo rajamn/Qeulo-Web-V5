@@ -1,0 +1,39 @@
+{% for out in outbound_logs %}
+  <div class="card mb-3">
+    <div class="card-header d-flex justify-content-between">
+      <span>
+        Sent <strong>{{ out.template_name }}</strong> at {{ out.created_at|date:"d-m-Y H:i" }}
+      </span>
+      <span class="badge 
+        {% if out.status == 'sent' %}bg-primary
+        {% elif out.status == 'delivered' %}bg-info
+        {% elif out.status == 'read' %}bg-success
+        {% elif out.status == 'failed' %}bg-danger
+        {% else %}bg-secondary{% endif %}
+      ">
+        {{ out.status }}
+      </span>
+    </div>
+
+    <div class="card-body">
+      <p><strong>To:</strong> {{ out.patient.patient_name }} ({{ out.recipient_number }})</p>
+      <p><strong>Placeholders:</strong> {{ out.placeholders }}</p>
+
+      {% if out.replies.exists %}
+        <ul class="list-unstyled">
+          {% for reply in out.replies.all %}
+            <li>
+              {{ reply.created_at|date:"d-m-Y H:i" }} —
+              <strong>{{ reply.event_type }}</strong>:
+              {{ reply.message_text }}
+            </li>
+          {% endfor %}
+        </ul>
+      {% else %}
+        <em>No replies yet</em>
+      {% endif %}
+    </div>
+  </div>
+{% empty %}
+  <p>No messages sent yet.</p>
+{% endfor %}
