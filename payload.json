@@ -1,0 +1,36 @@
+{
+  "event": "messageStatus",
+  "messageId": "test-assign-agent-001",
+  "dtMessageId": "DT12345",
+  "status": "DELIVERED",
+  "recipient": "+919063222874",
+  "templateName": "appointment_reschedule_universal",
+  "templateData": {
+    "body": {
+      "placeholders": [
+        "John Doe",
+        "Dr. Arjun Mehta",
+        "Token #15",
+        "New ETA: 11:30 AM",
+        "Delayed by 20 minutes"
+      ]
+    },
+    "buttons": [
+      {
+        "type": "PHONE_NUMBER",
+        "text": "Call Hospital",
+        "phoneNumber": "+919063222874"
+      }
+    ]
+  },
+  "cards": [
+    {
+      "type": "assign_agent",
+      "parameters": {
+        "agent_id": "A123",
+        "agent_name": "Reception Desk",
+        "agent_contact": "+919063222874"
+      }
+    }
+  ]
+}

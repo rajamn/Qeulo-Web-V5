@@ -1,0 +1,25 @@
+# ---- Core web ----
+Django==4.2.14
+gunicorn==22.0.0
+
+# ---- Database (RDS MySQL) ----
+mysqlclient==2.2.7
+
+# ---- AWS / storage ----
+boto3==1.39.3
+django-storages==1.14.4
+python-dotenv==1.1.1
+requests==2.32.4
+
+# ---- PDF & HTML rendering ----
+#reportlab>=3.6.12,<4               # simple, pure-Python PDF
+WeasyPrint==66.0               # HTML->PDF (needs system libs below)
+cssselect2==0.8.0
+pyphen==0.17.2
+arabic-reshaper==3.0.0
+
+# ---- Optional helpers you were using ----
+django-widget-tweaks==1.5.0
+python-decouple==3.8
+
+xhtml2pdf==0.2.14

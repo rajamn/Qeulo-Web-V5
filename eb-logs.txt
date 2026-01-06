@@ -1,0 +1,4 @@
+Retrieving logs...
+Logs were saved to /mnt/d/quelo_web_development/Quelo-Web v5/.elasticbeanstalk/logs/250816_230742
+Logs were saved to /mnt/d/quelo_web_development/Quelo-Web v5/.elasticbeanstalk/logs/250816_230742
+Updated symlink at /mnt/d/quelo_web_development/Quelo-Web v5/.elasticbeanstalk/logs/latest
