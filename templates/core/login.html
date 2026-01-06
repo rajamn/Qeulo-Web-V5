@@ -1,0 +1,225 @@
+{% extends 'base.html' %}
+{% load static %}
+{% load core_filters %}
+
+{% block title %}
+  {% if hospital %}{{ hospital.name }} | {% endif %}Welcome to Quelo
+{% endblock %}
+
+{% block extra_head %}
+<link href="https://fonts.googleapis.com/css2?family=Roboto&display=swap" rel="stylesheet">
+<style>
+  body {
+    font-family: 'Roboto', sans-serif;
+    background-color: #f8f9fa;
+  }
+
+  .main-container {
+    display: flex;
+    flex-wrap: wrap;
+    justify-content: center;
+    align-items: center;
+    min-height: calc(100vh - 80px);
+    padding: 40px 20px;
+    gap: 60px;
+  }
+
+  /* LEFT PANE */
+  .left-pane {
+    flex: 1 1 380px;
+    max-width: 420px;
+    text-align: center;
+  }
+
+  .hero-logo {
+    display: block;
+    margin: 0 auto 25px;
+    height: 120px;
+    transition: transform 0.3s ease;
+  }
+  .hero-logo:hover { transform: scale(1.05); }
+
+  .login-card {
+    background: #fff;
+    border-radius: 14px;
+    box-shadow: 0 4px 18px rgba(0,0,0,0.08);
+    padding: 32px 28px;
+  }
+
+  .login-card h4 {
+    color: #007bff;
+    margin-bottom: 25px;
+    text-align: center;
+  }
+
+  .btn-quelo {
+    background-color: #007bff;
+    border-color: #007bff;
+    color: white;
+  }
+
+  .cta-box {
+    background: linear-gradient(135deg,#007bff,#0056b3);
+    color: #fff;
+    border-radius: 12px;
+    padding: 22px 20px;
+    margin-top: 28px;
+    font-size: 0.95rem;
+  }
+  .cta-box a {
+    color: #fff;
+    font-weight: 600;
+    text-decoration: underline;
+  }
+  .cta-box a:hover { text-decoration: none; }
+
+  /* RIGHT PANE */
+  .right-pane {
+    flex: 1 1 480px;
+    max-width: 600px;
+    text-align: center;
+  }
+
+  .hero-title {
+    font-size: 2.3rem;
+    color: #e60000;
+    font-weight: 500;
+    margin-bottom: 15px;
+  }
+  .hero-subtitle {
+    color: #555;
+    font-size: 1.1rem;
+    margin-bottom: 25px;
+  }
+
+  .about-quelo p {
+    color: #555;
+    font-size: 1rem;
+    line-height: 1.6;
+    margin-bottom: 35px;
+  }
+
+  .about-quelo a {
+    color: #007bff;
+    text-decoration: none;
+    font-weight: 500;
+  }
+  .about-quelo a:hover { text-decoration: underline; }
+
+  .features-wrapper {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+    gap: 18px;
+  }
+
+  .feature-box {
+    background: #fff;
+    border-radius: 10px;
+    border: 1px solid #e2e6ea;
+    text-align: center;
+    padding: 20px;
+    transition: box-shadow 0.3s;
+  }
+  .feature-box:hover { box-shadow: 0 0 12px rgba(0,0,0,0.08); }
+
+  .feature-icon {
+    font-size: 1.9rem;
+    color: #007bff;
+    margin-bottom: 8px;
+  }
+
+  footer {
+    background-color: #212529;
+    color: #ddd;
+    text-align: center;
+    padding: 20px 10px;
+    margin-top: 40px;
+  }
+
+  @media (max-width: 768px) {
+    .main-container { flex-direction: column; }
+    .left-pane, .right-pane { max-width: 100%; }
+  }
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="main-container">
+  
+  <!-- LEFT COLUMN -->
+  <div class="left-pane">
+
+    {% if hospital and hospital.logo %}
+      <img src="{{ hospital.logo.url }}" class="hero-logo" alt="{{ hospital.name }} Logo">
+    {% else %}
+      <img src="{% static 'core/branding/quelo-logo.png' %}" class="hero-logo" alt="Quelo Logo">
+    {% endif %}
+
+    <div class="login-card">
+      {% if hospital %}
+        <h4>Login to {{ hospital.name }}</h4>
+      {% else %}
+        <h4>Login to Quelo</h4>
+      {% endif %}
+
+      {% if form.errors %}
+        <div class="alert alert-danger">
+          <strong>Invalid credentials</strong>. Please try again.
+        </div>
+      {% endif %}
+
+      <form method="post" class="needs-validation">
+        {% csrf_token %}
+        <div class="mb-3">
+          <label for="id_username" class="form-label">Mobile Number</label>
+          {{ form.username|add_attr:"class=form-control autocomplete=off placeholder='Enter mobile number'" }}
+        </div>
+        <div class="mb-3">
+          <label for="id_password" class="form-label">Password</label>
+          {{ form.password|add_attr:"class=form-control placeholder='Enter password'" }}
+        </div>
+        <button type="submit" class="btn btn-quelo w-100">Login</button>
+      </form>
+    </div>
+
+    <div class="cta-box">
+      {% if hospital %}
+        Need help? Contact {{ hospital.name }} reception.
+      {% else %}
+        Try <strong>Quelo</strong> free for 1 month — 
+        <a href="https://wa.me/919063222874?text=Hello%2C%20I%E2%80%99m%20interested%20in%20trying%20out%20Quelo%20and%20would%20love%20to%20use%20the%201-month%20free%20offer."
+           target="_blank">Message us on WhatsApp</a>.
+      {% endif %}
+    </div>
+  </div>
+
+  <!-- RIGHT COLUMN -->
+  {% if not hospital %}
+  <div class="right-pane">
+    <h1 class="hero-title">Streamline Clinic Operations with Quelo</h1>
+    <p class="hero-subtitle">Smart queue, billing & e-prescriptions — with WhatsApp integration.</p>
+
+    <div class="about-quelo">
+      <p>
+        <strong>Quelo</strong> (<a href="https://quelo.in" target="_blank">quelo.in</a>)
+        simplifies clinic management with queue, billing & e-prescriptions.
+        Visit <a href="https://queuelo.in" target="_blank">queuelo.in</a> to learn more.
+      </p>
+    </div>
+
+    <div class="features-wrapper">
+      <div class="feature-box"><div class="feature-icon"><i class="bi bi-people-fill"></i></div><h6>Patient Queue</h6></div>
+      <div class="feature-box"><div class="feature-icon"><i class="bi bi-pencil-square"></i></div><h6>Prescriptions</h6></div>
+      <div class="feature-box"><div class="feature-icon"><i class="bi bi-receipt-cutoff"></i></div><h6>Billing</h6></div>
+      <div class="feature-box"><div class="feature-icon"><i class="bi bi-person-plus"></i></div><h6>Registration</h6></div>
+      <div class="feature-box"><div class="feature-icon"><i class="bi bi-megaphone"></i></div><h6>Announcements</h6></div>
+      <div class="feature-box"><div class="feature-icon"><i class="bi bi-graph-up-arrow"></i></div><h6>Analytics</h6></div>
+    </div>
+  </div>
+  {% endif %}
+</div>
+
+<footer>
+  &copy; {{ current_year|default:2025 }} SDK Technologies. | All rights reserved.
+</footer>
+{% endblock %}

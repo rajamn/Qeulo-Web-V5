@@ -1,0 +1,274 @@
+{% load static %}
+{% load core_filters %}
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="theme-color" content="#0d6efd">
+
+  <title>Quelo – {% block title %}{% endblock %}</title>
+  <!-- Favicon / App Icons -->
+  <link rel="icon" href="{% static 'core/branding/favicon.ico' %}?v=5" sizes="any">
+  <link rel="apple-touch-icon" href="{% static 'core/branding/apple-touch-icon.png' %}?v=5">
+  <link rel="manifest" href="{% static 'core/branding/site.webmanifest' %}?v=5">
+  <meta name="msapplication-TileImage" content="{% static 'core/branding/mstile-150x150.png' %}">
+  <meta name="msapplication-TileColor" content="#0d6efd">
+
+  <!-- Bootstrap CSS + Icons -->
+  <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
+  <link href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.10.5/font/bootstrap-icons.css" rel="stylesheet">
+
+  {% block extra_head %}{% endblock %}
+
+  <style>
+    body { min-height: 100vh; }
+    .sidebar {
+      min-height: 100vh;
+      background-color: #198754;
+      color: #fff;
+      transition: all .3s ease;
+    }
+    .sidebar.collapsed { display: none; }
+    .sidebar a {
+      color: #fff;
+      padding: .5rem 1rem;
+      border-radius: .25rem;
+      text-decoration: none;
+      display: block;
+    }
+    .sidebar a.active { background-color: #145c32; font-weight: bold; }
+    .sidebar a:hover  { background-color: #157347; }
+
+    @media (max-width: 768px) {
+      .sidebar { position: absolute; z-index: 1000; width: 250px; }
+    }
+  </style>
+</head>
+
+<body class="bg-light">
+{% if request.resolver_match.url_name != 'login' %}
+<nav class="navbar navbar-expand-lg navbar-dark bg-primary">
+  <div class="container-fluid">
+    <!-- Left: toggler + brand -->
+    <div class="d-flex align-items-center">
+      <button class="btn btn-outline-light d-lg-none me-3" onclick="toggleSidebar()">
+        <i class="bi bi-list"></i>
+      </button>
+      <a class="navbar-brand me-4" href="{% url 'queue' %}">Quelo</a>
+
+      {% if request.user.is_authenticated %}
+        <span class="navbar-text text-white d-none d-lg-inline">
+          {{ request.user.display_name|default:request.user.mobile_num }}
+        </span>
+      {% endif %}
+    </div>
+
+    <!-- Mobile toggler -->
+    <button class="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target="#navbarNav">
+      <span class="navbar-toggler-icon"></span>
+    </button>
+
+    <!-- Right links -->
+    <div class="collapse navbar-collapse" id="navbarNav">
+      <ul class="navbar-nav ms-auto align-items-center">
+        <li class="nav-item">
+          <a class="nav-link" href="{% url 'patients:dashboard' %}">
+            <i class="bi bi-person-plus"></i> Patients
+          </a>
+        </li>
+        <li class="nav-item">
+          <a class="nav-link" href="{% url 'queue' %}">
+            <i class="bi bi-list-ol"></i> Queue
+          </a>
+        </li>
+        <li class="nav-item">
+          <a class="nav-link" href="{% url 'prescription' %}">
+            <i class="bi bi-journal-medical"></i> Prescription
+          </a>
+        </li>
+        <li class="nav-item">
+          <a class="nav-link" href="{% url 'billing:dashboard' %}">
+            <i class="bi bi-receipt"></i> Billing
+          </a>
+        </li>
+        <li class="nav-item">
+          <a class="nav-link text-warning" href="{% url 'logout' %}">
+            <i class="bi bi-box-arrow-right"></i> Logout
+          </a>
+        </li>
+      </ul>
+    </div>
+  </div>
+</nav>
+{% endif %}
+
+<div class="container-fluid">
+  <div class="row">
+    <!-- Sidebar -->
+    <aside id="sidebar" class="col-md-2 p-3 sidebar">
+      {% block sidebar %}
+      <div class="d-flex justify-content-between align-items-center mb-3">
+        <h4 class="mb-0">Quelo</h4>
+        <button class="btn btn-sm btn-outline-light" id="toggle-all">
+          <i class="bi bi-arrows-collapse"></i>
+        </button>
+      </div>
+
+      {% with n=request.resolver_match.url_name ns=request.resolver_match.namespace %}
+      <ul class="nav flex-column">
+
+        <!-- Patients Group -->
+        <li class="nav-item mb-2">
+          <a class="nav-link d-flex justify-content-between align-items-center"
+             data-bs-toggle="collapse" href="#patientsMenu" role="button"
+             aria-expanded="false">
+            <span><i class="bi bi-people"></i> Patients</span>
+            <i class="bi bi-caret-down"></i>
+          </a>
+          <div class="collapse {% if ns == 'patients' %}show{% endif %}" id="patientsMenu">
+            <ul class="nav flex-column ms-3">
+              <li>
+                <a href="{% url 'patients:dashboard' %}"
+                   class="nav-link {% if ns == 'patients' and n == 'dashboard' %}active{% endif %}">
+                  Dashboard
+                </a>
+              </li>
+              <li>
+                <a href="{% url 'patients:register' %}"
+                   class="nav-link {% if ns == 'patients' and n == 'register' %}active{% endif %}">
+                  Register
+                </a>
+              </li>
+              <li>
+                <a href="{% url 'queue' %}"
+                   class="nav-link {% if ns == 'patients' and n == 'queue' %}active{% endif %}">
+                  Queue
+                </a>
+              </li>
+              <li>
+                <a href="{% url 'reschedule_page' %}"
+                    class="nav-link {% if ns == 'patients' and n == 'reschedule_page' %}active{% endif %}">
+                    <i class="bi bi-clock-history"></i> Reschedule
+                </a>
+             </li>
+            </ul>
+          </div>
+        </li>
+
+        <!-- Prescription Group -->
+        <li class="nav-item mb-2">
+          <a class="nav-link d-flex justify-content-between align-items-center"
+             data-bs-toggle="collapse" href="#prescriptionMenu" role="button"
+             aria-expanded="false">
+            <span><i class="bi bi-journal-medical"></i> Prescription</span>
+            <i class="bi bi-caret-down"></i>
+          </a>
+          <div class="collapse {% if n in 'prescription drug_library drug_templates' %}show{% endif %}" id="prescriptionMenu">
+            <ul class="nav flex-column ms-3">
+              <li>
+                <a href="{% url 'prescription' %}"
+                   class="nav-link {% if n == 'prescription' %}active{% endif %}">
+                  Prescription
+                </a>
+              </li>
+              {% if request.user.is_authenticated and request.user.doctor_id %}
+              <li>
+                <a href="{% url 'drug_library' %}"
+                   class="nav-link {% if n == 'drug_library' %}active{% endif %}">
+                  Drug Library
+                </a>
+              </li>
+              <li>
+                <a href="{% url 'drug_templates' %}"
+                   class="nav-link {% if n == 'drug_templates' %}active{% endif %}">
+                  Drug Templates
+                </a>
+              </li>
+              {% endif %}
+            </ul>
+          </div>
+        </li>
+
+        <!-- Billing Group -->
+        <li class="nav-item mb-2">
+          <a class="nav-link d-flex justify-content-between align-items-center"
+             data-bs-toggle="collapse" href="#billingMenu" role="button"
+             aria-expanded="false">
+            <span><i class="bi bi-receipt"></i> Billing</span>
+            <i class="bi bi-caret-down"></i>
+          </a>
+          <div class="collapse {% if ns == 'billing' %}show{% endif %}" id="billingMenu">
+            <ul class="nav flex-column ms-3">
+              <li>
+                <a href="{% url 'billing:new' %}"
+                   class="nav-link {% if ns == 'billing' and n == 'new' %}active{% endif %}">
+                  New Bill
+                </a>
+              </li>
+              <li>
+                <a href="{% url 'billing:list' %}"
+                   class="nav-link {% if ns == 'billing' and n == 'list' %}active{% endif %}">
+                  Bills
+                </a>
+              </li>
+              <li>
+                <a href="{% url 'billing:dashboard' %}"
+                   class="nav-link {% if ns == 'billing' and n == 'dashboard' %}active{% endif %}">
+                  Dashboard
+                </a>
+              </li>
+            </ul>
+          </div>
+        </li>
+
+        <!-- Profile -->
+        <li class="nav-item mb-2">
+          <a href="{% url 'profile' %}"
+             class="nav-link {% if n == 'profile' %}active{% endif %}">
+            <i class="bi bi-person-circle"></i> Profile
+          </a>
+        </li>
+
+      </ul>
+      {% endwith %}
+      {% endblock %}
+    </aside>
+
+    <!-- Main Content -->
+    <main class="col-md-10 p-4 bg-light">
+      {% if messages %}
+        {% for message in messages %}
+          <div class="alert alert-{{ message.tags }} alert-dismissible fade show" role="alert">
+            {{ message }}
+            <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
+          </div>
+        {% endfor %}
+      {% endif %}
+      {% block content %}{% endblock %}
+    </main>
+  </div>
+</div>
+
+<script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
+<script>
+  function toggleSidebar() {
+    document.getElementById('sidebar').classList.toggle('collapsed');
+  }
+
+  // Collapse/Expand All
+  document.addEventListener("DOMContentLoaded", () => {
+    document.getElementById("toggle-all").addEventListener("click", () => {
+      const allMenus = document.querySelectorAll("#sidebar .collapse");
+      let anyOpen = Array.from(allMenus).some(m => m.classList.contains("show"));
+      allMenus.forEach(m => {
+        let bsCollapse = bootstrap.Collapse.getOrCreateInstance(m, { toggle: false });
+        anyOpen ? bsCollapse.hide() : bsCollapse.show();
+      });
+    });
+  });
+</script>
+
+{% block extra_scripts %}{% endblock %}
+</body>
+</html>

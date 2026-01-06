@@ -1,0 +1,449 @@
+{% load static %}
+{% load core_filters %}
+<!DOCTYPE html>
+<style>
+/* Override active nav-link inside green sidebar */
+.sidebar .nav-link.active,
+.sidebar .nav-link:active,
+.sidebar .nav-link.show {
+    background-color: #145c32 !important; /* darker green */
+    color: #ffffff !important;
+}
+
+/* Improve hover so it's consistent */
+.sidebar .nav-link:hover {
+    background-color: #157347 !important;
+    color: #fff !important;
+}
+
+/* Fix caret icon color */
+.sidebar .nav-link i {
+    color: #fff !important;
+}
+/* Highlight group header when submenu is active */
+.sidebar .collapse.show ~ .nav-link,
+.sidebar .nav-link[aria-expanded="true"] {
+    background-color: #146c43 !important;
+    color: #fff !important;
+}
+.sidebar .nav-link.active {
+  background-color: rgba(255,255,255,0.15) !important;
+  border-left: 4px solid #ffffff;
+  font-weight: 600;
+}
+.sidebar .nav-link[data-bs-toggle="collapse"] {
+  font-size: 0.95rem;
+  letter-spacing: 0.3px;
+  opacity: 0.95;
+}
+.sidebar .nav-link:hover {
+  background-color: rgba(255,255,255,0.2) !important;
+}
+/* Rotate icon when menu is open */
+.sidebar .nav-link[aria-expanded="true"] .bi-caret-down {
+  transform: rotate(-180deg);
+  transition: transform .2s ease;
+}
+.sidebar ul.nav > li {
+  margin-bottom: 6px;
+}
+
+.sidebar .nav .nav-link {
+  padding-top: 6px;
+  padding-bottom: 6px;
+}
+
+</style>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="theme-color" content="#0d6efd">
+
+  <title>Quelo – {% block title %}{% endblock %}</title>
+  <!-- Favicon / App Icons -->
+  <link rel="icon" href="{% static 'core/branding/favicon.ico' %}?v=5" sizes="any">
+  <link rel="apple-touch-icon" href="{% static 'core/branding/apple-touch-icon.png' %}?v=5">
+  <link rel="manifest" href="{% static 'core/branding/site.webmanifest' %}?v=5">
+  <meta name="msapplication-TileImage" content="{% static 'core/branding/mstile-150x150.png' %}">
+  <meta name="msapplication-TileColor" content="#0d6efd">
+
+  <!-- Bootstrap CSS + Icons -->
+  <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
+  <link href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.10.5/font/bootstrap-icons.css" rel="stylesheet">
+
+  {% block extra_head %}{% endblock %}
+
+  <style>
+    body { min-height: 100vh; }
+    .sidebar {
+      min-height: 100vh;
+      background-color: #198754;
+      color: #fff;
+      transition: all .3s ease;
+    }
+    .sidebar.collapsed { display: none; }
+    .sidebar a {
+      color: #fff;
+      padding: .5rem 1rem;
+      border-radius: .25rem;
+      text-decoration: none;
+      display: block;
+    }
+    .sidebar a.active { background-color: #145c32; font-weight: bold; }
+    .sidebar a:hover  { background-color: #157347; }
+
+    @media (max-width: 768px) {
+      .sidebar { position: absolute; z-index: 1000; width: 250px; }
+    }
+  </style>
+</head>
+
+<body class="bg-light">
+{% if request.resolver_match.url_name != 'login' %}
+<nav class="navbar navbar-expand-lg navbar-dark bg-primary">
+  <div class="container-fluid">
+    <!-- Left: toggler + brand -->
+    <div class="d-flex align-items-center">
+      <button class="btn btn-outline-light d-lg-none me-3" onclick="toggleSidebar()">
+        <i class="bi bi-list"></i>
+      </button>
+      <a class="navbar-brand me-4" href="{% url 'queue' %}">Quelo</a>
+
+      {% if request.user.is_authenticated %}
+        <span class="navbar-text text-white d-none d-lg-inline">
+          {{ request.user.display_name|default:request.user.mobile_num }}
+        </span>
+      {% endif %}
+    </div>
+
+    <!-- Mobile toggler -->
+    <button class="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target="#navbarNav">
+      <span class="navbar-toggler-icon"></span>
+    </button>
+
+    <!-- Right links -->
+    <div class="collapse navbar-collapse" id="navbarNav">
+      <ul class="navbar-nav ms-auto align-items-center">
+        <li class="nav-item">
+          <a class="nav-link" href="{% url 'patients:dashboard' %}">
+            <i class="bi bi-person-plus"></i> Patients
+          </a>
+        </li>
+        <li class="nav-item">
+          <a class="nav-link" href="{% url 'queue' %}">
+            <i class="bi bi-list-ol"></i> Queue
+          </a>
+        </li>
+        <li class="nav-item">
+          <a class="nav-link" href="{% url 'billing:dashboard' %}">
+            <i class="bi bi-receipt"></i> Billing
+          </a>
+        </li>
+        <li class="nav-item">
+          <a class="nav-link text-warning" href="{% url 'logout' %}">
+            <i class="bi bi-box-arrow-right"></i> Logout
+          </a>
+        </li>
+      </ul>
+    </div>
+  </div>
+</nav>
+{% endif %}
+
+<div class="container-fluid">
+  <div class="row">
+    <!-- Sidebar -->
+    <aside id="sidebar" class="col-md-2 p-3 sidebar">
+      {% block sidebar %}
+      <div class="d-flex justify-content-between align-items-center mb-3">
+        <h4 class="mb-0">Quelo</h4>
+        <button class="btn btn-sm btn-outline-light" id="toggle-all">
+          <i class="bi bi-arrows-collapse"></i>
+        </button>
+      </div>
+
+      {% with n=request.resolver_match.url_name ns=request.resolver_match.namespace %}
+      <ul class="nav flex-column">
+
+        <!-- Patients Group -->
+        <li class="nav-item mb-2">
+          <a class="nav-link d-flex justify-content-between align-items-center"
+             data-bs-toggle="collapse" href="#patientsMenu" role="button"
+             aria-expanded="false">
+            <span><i class="bi bi-people"></i> Patients</span>
+            <i class="bi bi-caret-down"></i>
+          </a>
+          <div class="collapse {% if ns == 'patients' or n in 'queue reschedule_page' %}show{% endif %}" id="patientsMenu">
+            <ul class="nav flex-column ms-3">
+              <li>
+                <a href="{% url 'patients:dashboard' %}"
+                   class="nav-link {% if ns == 'patients' and n == 'dashboard' %}active{% endif %}">
+                  <i class="bi bi-speedometer2"></i> Dashboard
+                </a>
+              </li>
+              <li>
+                <a href="{% url 'patients:register' %}"
+                   class="nav-link {% if n == 'register' %}active{% endif %}">
+                  <i class="bi bi-person-plus"></i> Register
+                </a>
+              </li>
+              <li>
+                <a href="{% url 'queue' %}"
+                   class="nav-link {% if n == 'queue' %}active{% endif %}">
+                  <i class="bi bi-list-ol"></i> Queue
+                </a>
+              </li>
+              <li>
+                <a href="{% url 'reschedule_page' %}"
+                   class="nav-link {% if n == 'reschedule_page' %}active{% endif %}">
+                   <i class="bi bi-clock-history"></i> Reschedule
+                </a>
+              </li>
+            </ul>
+          </div>
+        </li>
+    <!-- Prescription Group -->
+        <li class="nav-item mb-2">
+          <a class="nav-link d-flex justify-content-between align-items-center"
+             data-bs-toggle="collapse" href="#prescriptionMenu" role="button"
+             aria-expanded="false">
+            <span><i class="bi bi-journal-medical"></i> Rx Menu</span>
+            <i class="bi bi-caret-down"></i>
+          </a>
+          <div class="collapse {% if n in 'prescription drug_library drug_templates' %}show{% endif %}" id="prescriptionMenu">
+            <ul class="nav flex-column ms-3">
+              {% if request.user.doctor_id %}
+              <li class="nav-item mb-2">
+                  <a href="{% url 'doctors:dashboard' %}"
+                    class="nav-link {% if ns == 'doctors' and n == 'dashboard' %}active{% endif %}">
+                      <i class="bi bi-person-badge"></i> Dashboard
+
+                  </a>
+              </li>
+              {% endif %}
+              {% if not request.user.doctor_id %}
+              <!-- Reception / Admin only -->
+              <li>
+                <a href="{% url 'prescription:prescription' %}"
+                  class="nav-link {% if n == 'prescription' %}active{% endif %}">
+                  <i class="bi bi-file-earmark-medical"></i> View Rx
+                </a>
+              </li>
+
+              {% endif %}
+
+
+              {% if request.user.is_authenticated and request.user.doctor_id %}
+              <li>
+                <a href="{% url 'drug_library' %}"
+                   class="nav-link {% if n == 'drug_library' %}active{% endif %}">
+                  <i class="bi bi-collection"></i> Drug Library
+                </a>
+              </li>
+              <li>
+                <a href="{% url 'drug_templates' %}"
+                   class="nav-link {% if n == 'drug_templates' %}active{% endif %}">
+                  <i class="bi bi-card-list"></i> Drug Templates
+                </a>
+              </li>
+              {% endif %}
+            </ul>
+          </div>
+        </li>
+
+        <!-- Billing Group -->
+        <li class="nav-item mb-2">
+          <a class="nav-link d-flex justify-content-between align-items-center"
+             data-bs-toggle="collapse" href="#billingMenu" role="button"
+             aria-expanded="false">
+            <span><i class="bi bi-receipt"></i> Billing</span>
+            <i class="bi bi-caret-down"></i>
+          </a>
+          <div class="collapse {% if ns == 'billing' %}show{% endif %}" id="billingMenu">
+            <ul class="nav flex-column ms-3">
+              <li>
+                <a href="{% url 'billing:dashboard' %}"
+                   class="nav-link {% if ns == 'billing' and n == 'dashboard' %}active{% endif %}">
+                  <i class="bi bi-graph-up"></i> Dashboard
+                </a>
+              </li>
+              <li>
+                <a href="{% url 'billing:new' %}"
+                   class="nav-link {% if ns == 'billing' and n == 'new' %}active{% endif %}">
+                  <i class="bi bi-plus-square"></i> New Bill
+                </a>
+              </li>
+              <li>
+                <a href="{% url 'billing:list' %}"
+                   class="nav-link {% if ns == 'billing' and n == 'list' %}active{% endif %}">
+                  <i class="bi bi-list-check"></i> Bills
+                </a>
+              </li>
+            </ul>
+          </div>
+        </li>
+        {% if request.user.role.role_name in 'hospital_admin Administrator' %}
+        <!-- Reports Group -->
+        <li class="nav-item mb-2">
+        <!-- Reports menu header -->
+        <a class="nav-link d-flex justify-content-between align-items-center"
+          data-bs-toggle="collapse" href="#reportsMenu" role="button"
+          aria-expanded="false">
+          <span><i class="bi bi-bar-chart-line"></i> Reports</span>
+          <i class="bi bi-caret-down"></i>
+        </a>
+
+        <div class="collapse {% if ns == 'reports' %}show{% endif %}" id="reportsMenu">
+          <ul class="nav flex-column ms-3">
+
+            <!-- Reports Home -->
+            <li>
+              <a href="{% url 'reports:home' %}"
+                class="nav-link {% if ns == 'reports' and n == 'home' %}active{% endif %}">
+                <i class="bi bi-house"></i> Overview
+              </a>
+            </li>
+
+            <!-- Daily OPD -->
+            <li>
+              <a href="{% url 'reports:daily_opd' %}"
+                class="nav-link {% if ns == 'reports' and n == 'daily_opd' %}active{% endif %}">
+                <i class="bi bi-calendar-day"></i> Daily OPD
+              </a>
+            </li>
+
+            <!-- Revenue Report -->
+            <li>
+              <a href="{% url 'reports:revenue' %}"
+                class="nav-link {% if ns == 'reports' and n == 'revenue' %}active{% endif %}">
+                <i class="bi bi-currency-rupee"></i> Revenue Report
+              </a>
+            </li>
+            <!-- Doctor Productivity -->
+            <li>
+              <a href="{% url 'reports:doctor_productivity' %}"
+                class="nav-link {% if ns == 'reports' and n == 'doctor_productivity' %}active{% endif %}">
+                <i class="bi bi-person-badge"></i> Productivity
+              </a>
+            </li>
+            <li>
+              <a href="{% url 'reports:waiting_time' %}"
+                class="nav-link {% if n == 'waiting_time' %}active{% endif %}">
+                <i class="bi bi-clock-history"></i> Waiting Time
+              </a>
+            </li>
+          <!-- Pending Dues -->
+            <li>
+              <a href="{% url 'reports:pending_dues' %}"
+                class="nav-link {% if ns == 'reports' and n == 'pending_dues' %}active{% endif %}">
+                <i class="bi bi-exclamation-triangle"></i> Pending Dues
+              </a>
+            </li>
+
+
+          </ul>
+        </div>
+      </li>
+      <!-- Administration Group -->
+        <li class="nav-item mb-2">
+          <a class="nav-link d-flex justify-content-between align-items-center"
+            data-bs-toggle="collapse" href="#adminMenu" role="button"
+            aria-expanded="false">
+            <span><i class="bi bi-gear"></i> Administration</span>
+            <i class="bi bi-caret-down"></i>
+          </a>
+          <div class="collapse {% if ns == 'hospital_admin' %}show{% endif %}" id="adminMenu">
+            <ul class="nav flex-column ms-3">
+              <li>
+                <a href="{% url 'hospital_admin:doctor_list' %}"
+                  class="nav-link {% if ns == 'hospital_admin' and n == 'doctor_list' %}active{% endif %}">
+                  <i class="bi bi-person-badge"></i> Doctors
+                </a>
+              </li>
+              <li>
+                <a href="{% url 'hospital_admin:service_list' %}">
+                  <i class="bi bi-bandaid"></i> Services
+                </a>
+              </li>
+              <li>
+                <a href="{% url 'hospital_admin:hospital_settings' %}">
+                  <i class="bi bi-building-gear"></i> Hospital Settings
+                </a>
+              </li>
+            </ul>
+          </div>
+        </li>
+        {% endif %}
+        
+  <li class="nav-item mb-2">
+          <a href="{% url 'whatsapp_notifications:hospital_messages' %}"
+            class="nav-link {% if ns == 'whatsapp_notifications' and n == 'hospital_messages' %}active{% endif %}">
+            <i class="bi bi-whatsapp"></i> WhatsApp Messages
+          </a>
+        </li>
+
+        <!-- Profile -->
+        <li class="nav-item mb-2">
+          <a href="{% url 'profile' %}"
+             class="nav-link {% if n == 'profile' %}active{% endif %}">
+            <i class="bi bi-person-circle"></i> Profile
+          </a>
+        </li>
+
+      </ul>
+      {% endwith %}
+      {% endblock %}
+    </aside>
+
+    <!-- Main Content -->
+    <main class="col-md-10 p-4 bg-light">
+      {% if messages %}
+        {% for message in messages %}
+          <div class="alert alert-{{ message.tags }} alert-dismissible fade show" role="alert">
+            {{ message }}
+            <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
+          </div>
+        {% endfor %}
+      {% endif %}
+      {% block content %}{% endblock %}
+    </main>
+  </div>
+</div>
+
+<script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
+<script>
+  function toggleSidebar() {
+    document.getElementById('sidebar').classList.toggle('collapsed');
+  }
+
+  // Collapse/Expand All
+  document.addEventListener("DOMContentLoaded", () => {
+    document.getElementById("toggle-all").addEventListener("click", () => {
+      const allMenus = document.querySelectorAll("#sidebar .collapse");
+      let anyOpen = Array.from(allMenus).some(m => m.classList.contains("show"));
+      allMenus.forEach(m => {
+        let bsCollapse = bootstrap.Collapse.getOrCreateInstance(m, { toggle: false });
+        anyOpen ? bsCollapse.hide() : bsCollapse.show();
+      });
+    });
+  });
+// Auto-close sidebar on mobile when clicking any menu item
+document.addEventListener("DOMContentLoaded", () => {
+  const sidebar = document.getElementById("sidebar");
+  const links = sidebar.querySelectorAll("a.nav-link");
+
+  links.forEach(link => {
+    link.addEventListener("click", () => {
+      if (window.innerWidth < 768) {
+        sidebar.classList.add("collapsed");
+      }
+    });
+  });
+});
+
+</script>
+
+{% block extra_scripts %}{% endblock %}
+</body>
+</html>

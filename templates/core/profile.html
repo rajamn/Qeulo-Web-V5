@@ -1,0 +1,28 @@
+{% extends 'base_sidebar.html' %}
+{% block title %}My Profile{% endblock %}
+{% load core_filters %}
+{% block content %}
+<span class="navbar-text">
+  {% if hospital %}
+  <h4>{{ hospital.name }} – My Profile</h4>
+  {% else %}
+  <h4>My Profile</h4>
+  {% endif %}
+</span>
+  <h2>My Profile</h2>
+  <div class="card mt-3">
+  <div class="card-body">
+    <form method="post" novalidate>
+      {% csrf_token %}
+      <div class="mb-3">
+        {{ form.display_name.label_tag }}
+        {{ form.display_name|add_attr:"class=form-control" }}
+        {% if form.display_name.errors %}
+          <div class="text-danger small">{{ form.display_name.errors.0 }}</div>
+        {% endif %}
+      </div>
+      <button type="submit" class="btn btn-primary w-100">Save</button>
+    </form>
+  </div>
+</div>
+{% endblock %}
