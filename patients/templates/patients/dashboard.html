@@ -1,0 +1,127 @@
+{% extends 'base_sidebar.html' %}
+{% load core_filters %}
+{% block title %}Patients Dashboard{% endblock %}
+
+{% block content %}
+<div class="container py-4">
+  <!-- Header Row -->
+  <div class="d-flex justify-content-between align-items-center mb-4">
+    <h3 class="text-primary mb-0">
+      <i class="bi bi-people"></i> Patients
+    </h3>
+    <a class="btn btn-success shadow-sm" href="{% url 'patients:register' %}">
+      <i class="bi bi-person-plus"></i> New Registration
+    </a>
+  </div>
+
+  <!-- Search Bar -->
+  <form class="mb-4" method="get" id="patient-search-form">
+    <div class="input-group input-group-lg shadow-sm">
+      <span class="input-group-text bg-white border-end-0">
+        <i class="bi bi-search text-muted"></i>
+      </span>
+      <input
+        type="text"
+        class="form-control border-start-0"
+        name="q"
+        id="patient-search"
+        placeholder="Search by Name / Mobile / Patient ID"
+        value="{{ q }}"
+        autocomplete="off"
+      >
+      <button class="btn btn-primary" type="submit">
+        <i class="bi bi-arrow-right-circle"></i>
+      </button>
+    </div>
+  </form>
+
+
+  <!-- Patient Table -->
+  <div class="card shadow-sm border-0">
+    <div class="card-body p-0">
+      <div class="table-responsive">
+        <table class="table table-hover align-middle mb-0">
+          <thead class="table-light">
+            <tr>
+          <th>Patient ID</th>
+          <th>Name</th>
+          <th>Mobile</th>
+          <th>Contact Name</th>
+          <th>Gender</th>
+          <th>Age</th>
+          <th>
+            <a href="?{% if q %}q={{ q|urlencode }}&amp;{% endif %}sort=doctor"
+              id="sort-by-doctor"
+              class="text-decoration-none text-dark">
+              Latest Doctor
+              {% if sort == "doctor" %}
+                <i class="bi bi-caret-down-fill"></i>
+              {% endif %}
+            </a>
+          </th>
+          <th class="text-center">Actions</th>
+
+            </tr>
+          </thead>
+          <tbody id="patients-tbody">
+            {% include "patients/_rows.html" %}
+          </tbody>
+        </table>
+      </div>
+    </div>
+  </div>
+
+  {% if not patients %}
+    <div class="alert alert-info mt-3 text-center">
+      <i class="bi bi-info-circle"></i> No patients found. Try adjusting your search.
+    </div>
+  {% endif %}
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+(function() {
+  const input   = document.getElementById('patient-search');
+  const tbody   = document.getElementById('patients-tbody');
+  const form    = document.getElementById('patient-search-form');
+  const sortA   = document.getElementById('sort-by-doctor');
+  let sortVal   = "{{ sort }}";
+  let aborter   = null;
+  let timer     = null;
+
+  form?.addEventListener('submit', e => e.preventDefault());
+
+  function fetchRows() {
+    const q = (input?.value || '').trim();
+    const params = new URLSearchParams();
+    if (q) params.set('q', q);
+    if (sortVal) params.set('sort', sortVal);
+
+    if (aborter) aborter.abort();
+    aborter = new AbortController();
+
+    fetch(`{% url 'patients:dashboard' %}?` + params.toString(), {
+      headers: {'X-Requested-With': 'XMLHttpRequest'},
+      signal: aborter.signal
+    })
+    .then(r => r.text())
+    .then(html => { tbody.innerHTML = html; })
+    .catch(err => { if (err.name !== 'AbortError') console.warn(err); });
+  }
+
+  // Live search debounce
+  input?.addEventListener('input', () => {
+    clearTimeout(timer);
+    timer = setTimeout(fetchRows, 250);
+  });
+
+  // Sort click
+  sortA?.addEventListener('click', (e) => {
+    e.preventDefault();
+    sortVal = 'doctor';
+    fetchRows();
+  });
+})();
+</script>
+{% endblock %}

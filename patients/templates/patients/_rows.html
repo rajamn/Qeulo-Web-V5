@@ -1,0 +1,84 @@
+{# patients/_rows.html #}
+{% load core_filters %}
+
+{% for patient in patients %}
+<tr class="{% if due_map|get_item:patient.id %}table-danger{% endif %}">
+  <td>{{ patient.patient_code }}</td>
+  <td>
+    {{ patient.patient_name }}
+    {% if due_map|get_item:patient.id %}
+      <span class="badge bg-danger ms-1">Due</span>
+    {% endif %}
+  </td>
+  <td>{{ patient.contact.mobile_num }}</td>
+  <td>{{ patient.contact.contact_name }}</td>
+  <td>{{ patient.gender }}</td>
+  <td>{{ patient.age_years }}y {{ patient.age_months }}m</td>
+  <td>{{ latest_doctor|get_item:patient.id|default:"—" }}</td>
+
+  <td class="text-center">
+
+    <!-- Patient Menu -->
+    <div class="btn-group me-1">
+      <button class="btn btn-light btn-sm border dropdown-toggle"
+              data-bs-toggle="dropdown"
+              title="Patient Actions">
+        <i class="bi bi-person"></i>
+      </button>
+
+      <ul class="dropdown-menu dropdown-menu-end">
+        <li>
+          <a class="dropdown-item" href="{% url 'patients:view' patient.id %}">
+            <i class="bi bi-eye"></i> View
+          </a>
+        </li>
+        <li>
+          <a class="dropdown-item" href="{% url 'patients:edit' patient.id %}">
+            <i class="bi bi-pencil-square"></i> Edit
+          </a>
+        </li>
+      </ul>
+    </div>
+
+    <!-- Records Menu -->
+    <div class="btn-group">
+      <button class="btn btn-light btn-sm border dropdown-toggle"
+              data-bs-toggle="dropdown"
+              title="Medical Records">
+        <i class="bi bi-folder"></i>
+      </button>
+
+      <ul class="dropdown-menu dropdown-menu-end">
+
+        <li>
+          <a class="dropdown-item" href="{% url 'vitals:create_for_patient' patient.id %}">
+            <i class="bi bi-activity"></i> Add Vitals
+          </a>
+        </li>
+        <li><hr class="dropdown-divider"></li>
+
+        <li>
+          <a class="dropdown-item"
+             href="{% url 'visit_workspace:upload_document' pk=patient.id %}">
+            <i class="bi bi-cloud-upload"></i> Upload Document
+          </a>
+        </li>
+        <li>
+          <a class="dropdown-item"
+             href="{% url 'visit_workspace:patient_history' pk=patient.id %}">
+            <i class="bi bi-journal-text"></i> View History
+          </a>
+        </li>
+      </ul>
+    </div>
+
+  </td>
+</tr>
+
+{% empty %}
+<tr>
+  <td colspan="8" class="text-center text-muted py-3">
+    <i class="bi bi-info-circle"></i> No patients found.
+  </td>
+</tr>
+{% endfor %}

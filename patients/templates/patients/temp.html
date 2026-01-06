@@ -1,0 +1,99 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <title>Clinic Token Printer</title>
+  <style>
+    body {
+      font-family: Arial, sans-serif;
+      margin: 40px;
+    }
+
+    .form-section {
+      margin-bottom: 20px;
+    }
+
+    .form-section input {
+      padding: 10px;
+      margin-right: 10px;
+      font-size: 16px;
+    }
+
+    .form-section button {
+      padding: 10px 20px;
+      font-size: 16px;
+      cursor: pointer;
+    }
+
+    .token {
+      border: 2px dashed #444;
+      padding: 20px;
+      width: 300px;
+      margin-top: 30px;
+      font-size: 18px;
+      background-color: #fdfdfd;
+    }
+
+    .token h2 {
+      margin-top: 0;
+    }
+
+    @media print {
+      body * {
+        visibility: hidden;
+      }
+      .token, .token * {
+        visibility: visible;
+      }
+      .token {
+        position: absolute;
+        top: 100px;
+        left: 100px;
+      }
+    }
+  </style>
+</head>
+<body>
+
+  <div class="form-section">
+    <input type="text" id="patientName" placeholder="Patient Name" required>
+    <input type="text" id="doctorName" placeholder="Doctor Name" required>
+    <button onclick="generateToken()">Generate Token</button>
+  </div>
+
+  <div id="tokenDisplay" class="token" style="display:none;"></div>
+
+  <script>
+    let tokenCounter = 1;
+
+    function generateToken() {
+      const patientName = document.getElementById('patientName').value.trim();
+      const doctorName = document.getElementById('doctorName').value.trim();
+
+      if (!patientName || !doctorName) {
+        alert("Please enter both Patient and Doctor names.");
+        return;
+      }
+
+      const tokenNumber = `T-${String(tokenCounter).padStart(3, '0')}`;
+      const queuePosition = tokenCounter;
+
+      const tokenHTML = `
+        <h2>Clinic Token</h2>
+        <p><strong>Patient:</strong> ${patientName}</p>
+        <p><strong>Doctor:</strong> ${doctorName}</p>
+        <p><strong>Token No:</strong> ${tokenNumber}</p>
+        <p><strong>Queue Position:</strong> ${queuePosition}</p>
+      `;
+
+      document.getElementById('tokenDisplay').innerHTML = tokenHTML;
+      document.getElementById('tokenDisplay').style.display = "block";
+
+      window.print(); // Print the token
+
+      tokenCounter++; // Increment token
+    }
+  </script>
+
+</body>
+</html>

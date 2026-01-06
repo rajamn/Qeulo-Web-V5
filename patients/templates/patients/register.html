@@ -1,0 +1,426 @@
+{% extends 'base_sidebar.html' %}
+{% load core_filters %}
+{% block title %}
+  {% if is_edit %}Edit Patient{% else %}Patient Registration{% endif %}
+{% endblock %}
+
+{% block content %}
+<div class="container mt-4">
+  <h2 class="mb-4 text-primary">
+    {% if is_edit %}Edit Patient{% else %}Patient Registration{% endif %}
+  </h2>
+
+  {% if messages %}
+    {% if debug_error %}
+      <div class="alert alert-danger">
+        <strong>Server Error:</strong> {{ debug_error }}
+      </div>
+      <details open>
+        <summary>Stack Trace</summary>
+        <pre style="white-space: pre-wrap;">{{ trace }}</pre>
+      </details>
+    {% endif %}
+
+    {% for message in messages %}
+      <div class="alert alert-{{ message.tags }} alert-dismissible fade show" role="alert">
+        {{ message }}
+        <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
+      </div>
+    {% endfor %}
+  {% endif %}
+
+  {% if eta %}
+    <div class="alert alert-info mt-3 text-center">
+      <strong>Estimated Time of Appointment (ETA):</strong>
+      {{ eta|time:"H:i" }}
+      {% if que_pos %}
+        <span class="text-muted ms-2">(Queue Position: {{ que_pos }})</span>
+      {% endif %}
+    </div>
+  {% endif %}
+
+  <!-- 💳 Registration Form -->
+  <form method="post" class="card p-4 shadow-sm bg-white" autocomplete="off">
+    {% csrf_token %}
+    <input type="hidden" name="payment-paid_on" id="id_payment-paid_on">
+
+    <div class="row">
+      <!-- Search name or number -->
+      <div class="mb-3 position-relative">
+        <label for="patient_search" class="form-label">Search Patient (Name / Mobile / Patient id)</label>
+        <div class="input-group">
+          <input
+            type="text"
+            id="patient_search"
+            class="form-control"
+            placeholder="Type at least 3 characters..."
+            autocomplete="off"
+          >
+          <button class="btn btn-outline-primary" type="button" id="search_btn">
+            Search
+          </button>
+        </div>
+        <ul
+          id="search_results"
+          class="list-group position-absolute w-100 mt-1 shadow-sm"
+          style="z-index: 2000; display: none; max-height: 200px; overflow-y: auto;"
+        ></ul>
+      </div>
+
+      <!-- Left: Contact + Demographics -->
+      <div class="col-md-6">
+        <h5 class="text-secondary mb-3">Patient Info</h5>
+
+        <div class="mb-3 d-flex align-items-end gap-2">
+          <div class="flex-grow-1">
+            {{ patient_form.mobile_num.label_tag }}
+            {{ patient_form.mobile_num|add_attr:"class=form-control autocomplete=off placeholder=Enter mobile number autofocus id=id_patient-mobile_num" }}
+          </div>
+
+          <div class="form-check mb-2">
+            <input class="form-check-input" type="checkbox" id="generate_mobile">
+            <label class="form-check-label small" for="generate_mobile">
+              No number?
+            </label>
+          </div>
+        </div>
+        <div class="mb-3">
+          {{ patient_form.contact_name.label_tag }}
+          {{ patient_form.contact_name|add_attr:"class=form-control autocomplete=off  id=contact_name placeholder=Enter contact name" }}
+        </div>
+
+        <div class="mb-3 d-flex align-items-end gap-3">
+          <div class="flex-grow-1">
+            {{ patient_form.patient_name.label_tag }}
+            {{ patient_form.patient_name|add_attr:"class=form-control id=patient_name autocomplete=off  placeholder=Enter patient name" }}
+          </div>
+          <div class="form-check mb-2">
+            <input class="form-check-input" type="checkbox" id="same_as_contact">
+            <label class="form-check-label" for="same_as_contact">Same?</label>
+          </div>
+        </div>
+        <div class="mb-3">
+          {{ patient_form.dob.label_tag }}
+          <div class="d-flex align-items-center gap-2">
+            {{ patient_form.dob|add_attr:"class=form-control placeholder=DD-MM-YYYY id=id_patient-dob" }}
+          <div class="form-check ms-2">
+              <input class="form-check-input" type="checkbox" id="age_known">
+              <label class="form-check-label small" for="age_known">Only age known?</label>
+            </div>
+            <input
+              type="number"
+              id="age_years"
+              class="form-control d-none"
+              style="width: 80px;"
+              placeholder="Age"
+              min="0"
+              max="120"
+            >
+          </div>
+          <div class="form-text text-muted">
+            <strong>Enter DD-MM-YYYY or age (years) if exact date unknown</strong></div>
+        </div>
+
+        <div class="mb-3">
+          {{ patient_form.gender.label_tag }}
+          {{ patient_form.gender|add_attr:"class=form-select" }}
+        </div>
+
+        <div class="mb-3">
+          {{ patient_form.referred_by.label_tag }}
+          {{ patient_form.referred_by|add_attr:"class=form-control placeholder=Optional" }}
+        </div>
+      </div>
+
+      <!-- Right: Doctor + Billing -->
+      <div class="col-md-6">
+        <h5 class="text-secondary mb-3">Visit & Billing</h5>
+
+        <div class="mb-3">
+          {{ appointment_form.doctor.label_tag }}
+          {{ appointment_form.doctor|add_attr:"class=form-select" }}
+        </div>
+
+        <div class="mb-3">
+          {{ appointment_form.appointment_on.label_tag }}
+          {{ appointment_form.appointment_on|add_attr:"class=form-control" }}
+        </div>
+
+        <h6 class="text-secondary mt-4">Billing Details</h6>
+        <div class="row border rounded p-3 mb-3 bg-light shadow-sm">
+          <div class="col-md-4">
+            {{ transaction_form.service.label_tag }}
+            {{ transaction_form.service|add_attr:"class=form-select" }}
+          </div>
+          <div class="col-md-4">
+            {{ transaction_form.pay_type.label_tag }}
+            {{ transaction_form.pay_type|add_attr:"class=form-select" }}
+          </div>
+          <div class="col-md-4">
+            {{ transaction_form.amount.label_tag }}
+            {{ transaction_form.amount|add_attr:"class=form-control amount-field" }}
+          </div>
+        </div>
+      <!-- 🔁 ETA Display -->
+      <div id="eta-display" class="fs-6 text-primary fw-semibold mt-3">
+        <strong>Estimated Time of Appointment (ETA):</strong>
+        <span id="eta-value">—</span>
+      </div>
+    <div class="mt-4">
+          <button type="submit" name="submit" class="btn btn-primary">
+            {% if is_edit %}Update{% else %}Submit{% endif %}
+          </button>
+          <button type="reset" class="btn btn-outline-secondary ms-2">Clear</button>
+
+          {% if is_edit and patient %}
+            <input type="hidden" name="patient_id" value="{{ patient.id }}">
+            <a class="btn btn-info ms-2" href="{% url 'patients:view' patient.id %}">View Details</a>
+          {% endif %}
+        </div>
+      </div>
+    </div>
+  </form>
+</div>
+
+<!-- 💡 Scripts -->
+<script>
+document.addEventListener("DOMContentLoaded", function () {
+  const $ = (id) => document.getElementById(id);
+  // 8️⃣ --- Auto-generate mobile number if none available ---
+  const genCheckbox = document.getElementById("generate_mobile");
+  const mobileField = document.getElementById("id_patient-mobile_num");
+
+  function generateRandomMobile() {
+    // Always start with '1' + 9 random digits
+    let num = "1";
+    for (let i = 0; i < 9; i++) {
+      num += Math.floor(Math.random() * 10);
+    }
+    return num;
+  }
+
+  // Prevent accidental empty value when unchecked & immediately submitted
+if (genCheckbox && mobileField) {
+  genCheckbox.addEventListener("change", () => {
+    if (genCheckbox.checked) {
+      const randomNum = generateRandomMobile();
+      mobileField.value = randomNum;
+      mobileField.readOnly = true;
+      mobileField.classList.add("bg-light");
+    } else {
+      mobileField.readOnly = false;
+      mobileField.classList.remove("bg-light");
+      mobileField.value = ""; // clear only if user truly wants to input
+      mobileField.focus();
+    }
+  });
+}
+  // 1️⃣ --- Core form fields ---
+  const contactIdTpl = "{{ patient_form.contact_name.id_for_label }}";
+  const patientIdTpl = "{{ patient_form.patient_name.id_for_label }}";
+  const contactInput = $("contact_name") || (contactIdTpl ? $(contactIdTpl) : null);
+  const patientInput = $("patient_name") || (patientIdTpl ? $(patientIdTpl) : null);
+  const checkbox = $("same_as_contact");
+  const apptDate = document.getElementById("id_appointment-appointment_on");
+  const payDate  = document.getElementById("id_payment-paid_on");
+
+  // 2️⃣ --- Same as contact logic ---
+  function copyIfChecked() {
+    if (checkbox && checkbox.checked && contactInput && patientInput) {
+      patientInput.value = contactInput.value || "";
+    }
+  }
+  if (checkbox && contactInput && patientInput) {
+    copyIfChecked();
+    checkbox.addEventListener("change", () => {
+      copyIfChecked();
+      patientInput.readOnly = checkbox.checked;
+    });
+    contactInput.addEventListener("input", copyIfChecked);
+  }
+  // 9️⃣ --- Auto-generate DOB based on age ---
+const ageCheckbox = document.getElementById("age_known");
+const ageInput = document.getElementById("age_years");
+const dobInput = document.getElementById("id_patient-dob");
+
+if (ageCheckbox && ageInput && dobInput) {
+  ageCheckbox.addEventListener("change", () => {
+    if (ageCheckbox.checked) {
+      ageInput.classList.remove("d-none");
+      dobInput.readOnly = true;
+      dobInput.classList.add("bg-light");
+      dobInput.value = "";
+    } else {
+      ageInput.classList.add("d-none");
+      dobInput.readOnly = false;
+      dobInput.classList.remove("bg-light");
+      dobInput.value = "";
+    }
+  });
+
+  ageInput.addEventListener("input", () => {
+    const age = parseInt(ageInput.value);
+    if (!isNaN(age) && age >= 0 && age <= 120) {
+      const now = new Date();
+      const birthYear = now.getFullYear() - age;
+      dobInput.value = `01-01-${birthYear}`;
+    } else {
+      dobInput.value = "";
+    }
+  });
+}
+
+
+  // 3️⃣ --- ETA logic ---
+  const doctorSelect = document.getElementById("id_appointment-doctor");
+  const etaDisplay = document.getElementById("eta-display");
+  // 🔟 --- Auto-fill Doctor Consultation Fee ---
+  const amountInput = document.getElementById("id_txn-amount");
+
+  if (doctorSelect && amountInput) {
+    doctorSelect.addEventListener("change", function () {
+      const doctorId = this.value;
+
+      if (!doctorId) {
+        amountInput.value = "";
+        return;
+      }
+
+      fetch(`/doctors/${doctorId}/fee/`)
+        .then(res => res.json())
+        .then(data => {
+          amountInput.value = data.fee || 0;
+        })
+        .catch(err => {
+          console.error("Error fetching consultation fee:", err);
+          amountInput.value = "";
+        });
+    });
+  }
+
+  if (doctorSelect && etaDisplay) {
+    doctorSelect.addEventListener("change", async function () {
+      const doctorId = this.value;
+      if (!doctorId) { etaDisplay.textContent = "—"; return; }
+
+      const apiUrl = `/api/doctor_info/${doctorId}/`;
+      console.log("➡️ Fetching ETA from:", apiUrl);
+      try {
+        const response = await fetch(apiUrl);
+        if (!response.ok) throw new Error("Network error");
+        const data = await response.json();
+        etaDisplay.textContent = data.eta
+          ? `${data.eta} (${data.queued} patient${data.queued !== 1 ? "s" : ""} ahead)`
+          : "—";
+      } catch (err) {
+        console.error("Doctor info API failed:", err);
+        etaDisplay.textContent = "—";
+      }
+    });
+  }
+
+  // 4️⃣ --- Sync appointment date → payment date ---
+  try {
+    if (apptDate && payDate) {
+      const syncPayDate = () => { payDate.value = apptDate.value; };
+      syncPayDate();
+      apptDate.addEventListener("change", syncPayDate);
+    }
+  } catch (e) {
+    console.warn("⚠️ Appointment date sync skipped:", e);
+  }
+
+  // 5️⃣ --- Search box logic ---
+  const searchInput  = $("patient_search");
+  const searchButton = $("search_btn");
+  const resultsBox   = $("search_results");
+
+  const mobileInput   = $("id_patient-mobile_num");
+  const genderSelect  = $("id_patient-gender");
+  const referredByInp = $("id_patient-referred_by");
+  
+  if (dobInput) dobInput.value = "";
+
+
+  async function searchPatients(query) {
+    if (query.length < 3) { resultsBox.style.display = "none"; return; }
+
+    const apiUrl = `/patients/search/?q=${encodeURIComponent(query)}`;
+    console.log("🔍 Searching:", apiUrl);
+    try {
+      const res = await fetch(apiUrl);
+      if (!res.ok) throw new Error("Network error");
+      const data = await res.json();
+      const results = data.results || [];
+
+      resultsBox.innerHTML = "";
+      if (results.length === 0) {
+        resultsBox.innerHTML = `<li class="list-group-item text-muted">No matches found</li>`;
+        resultsBox.style.display = "block";
+        return;
+      }
+
+      results.forEach(p => {
+        const li = document.createElement("li");
+        li.className = "list-group-item list-group-item-action";
+        const dobText = p.dob ? ` | DOB: ${p.dob}` : "";
+        const genderText = p.gender ? ` | ${p.gender}` : "";
+        li.innerHTML = `
+          <strong>${p.patient_name || p.contact_name}</strong> 
+          (${p.mobile})${dobText}${genderText}
+        `;
+
+        li.addEventListener("click", () => {
+          if (contactInput)  contactInput.value  = p.contact_name || p.patient_name;
+          if (patientInput)  patientInput.value  = p.patient_name || p.contact_name;
+          if (mobileInput)   mobileInput.value   = p.mobile;
+          if (genderSelect)  genderSelect.value  = p.gender || "O";
+          if (referredByInp) referredByInp.value = p.referred_by || "";
+           // ✅ Autofill DOB
+          
+          if (dobInput && (!ageCheckbox || !ageCheckbox.checked)) {
+            dobInput.value = p.dob_raw || "";}
+          resultsBox.style.display = "none";
+          searchInput.value = `${p.patient_name || p.contact_name}`;
+        });
+        resultsBox.appendChild(li);
+      });
+      resultsBox.style.display = "block";
+    } catch (err) {
+      console.error("❌ Patient search failed:", err);
+      resultsBox.style.display = "none";
+    }
+  }
+
+  if (searchInput && searchButton && resultsBox) {
+    searchInput.addEventListener("input", (e) => searchPatients(e.target.value.trim()));
+    searchButton.addEventListener("click", () => searchPatients(searchInput.value.trim()));
+    document.addEventListener("click", (e) => {
+      if (!resultsBox.contains(e.target) && e.target !== searchInput) {
+        resultsBox.style.display = "none";
+      }
+    });
+  }
+
+  // 6️⃣ --- DOB input auto-format ---
+  dobInput.addEventListener("blur", function (e) {
+  const val = e.target.value;
+  const parts = val.split("-");
+  if (parts.length === 3) {
+    const [day, month, year] = parts.map(Number);
+    const dateObj = new Date(year, month - 1, day);
+    if (
+      dateObj.getFullYear() !== year ||
+      dateObj.getMonth() !== month - 1 ||
+      dateObj.getDate() !== day
+    ) {
+      alert("Please enter a valid date.");
+      e.target.focus();
+    }
+  }
+});
+
+});
+</script>
+
+{% endblock %}

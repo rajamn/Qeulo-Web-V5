@@ -1,0 +1,108 @@
+{% extends 'base_sidebar.html' %}
+{% block title %}Patient Details{% endblock %}
+
+{% block content %}
+<div class="container mt-4">
+  <h2 class="mb-4 text-primary">Patient Details</h2>
+
+  <!-- Patient Information Card -->
+  <div class="card p-4 mb-4">
+    <h5>Patient Information</h5>
+    <div><b>Name:</b> {{ patient.patient_name }}</div>
+    <div><b>Mobile:</b> {{ contact.mobile_num }}</div>
+    <div><b>Contact Name:</b> {{ contact.contact_name }}</div>
+    <div><b>Age:</b> {{ patient.age_years }} years {{ patient.age_months }} months</div>
+    <div><b>Gender:</b> {{ patient.gender }}</div>
+    <div><b>Referred By:</b> {{ patient.referred_by }}</div>
+  </div>
+
+  <!-- Quick Print for Latest Appointment -->
+  <!-- Quick Print for Latest Appointment -->
+{% if latest_appt_id %}
+  <div class="mb-3">
+    <a class="btn btn-success me-2"
+       href="{% url 'patients:cash_receipt_pdf' latest_appt_id %}"
+       target="_blank">
+       <i class="bi bi-receipt"></i> Receipt
+    </a>
+
+    <a class="btn btn-secondary me-2"
+       href="{% url 'patients:token_pdf' latest_appt_id %}"
+       target="_blank">
+       <i class="bi bi-person-badge"></i> Token
+    </a>
+
+    <a class="btn btn-outline-primary"
+      href="{% url 'patients:combined_receipt_token_pdf' latest_appt_id %}"
+      target="_blank">
+      <i class="bi bi-printer"></i> Receipt + Token
+    </a>
+
+
+    {% if vitals_new_for_appt_url %}
+      <a href="{{ vitals_new_for_appt_url }}" class="btn btn-outline-primary btn-sm">
+        <i class="bi bi-activity"></i> Add Vitals
+      </a>
+    {% elif vitals_new_url %}
+      <a href="{{ vitals_new_url }}" class="btn btn-outline-primary btn-sm">
+        <i class="bi bi-activity"></i> Add Vitals
+      </a>
+    {% endif %}
+  </div>
+{% endif %}
+
+  <!-- Appointments Card -->
+  <div class="card p-4 mb-4">
+    <h5>Appointments</h5>
+    <table class="table table-bordered align-middle">
+      <thead>
+        <tr>
+          <th>Date</th>
+          <th>Doctor</th>
+          <th>Status</th>
+          <th>Token</th>
+          <th>Amount</th>
+          <th>Actions</th>
+        </tr>
+      </thead>
+      <tbody>
+  {% for appt in appointments %}
+  <tr>
+    <td>{{ appt.appointment_on|date:"M. j, Y" }}</td>
+    <td>{{ appt.doctor.doctor_name }}</td>
+    <td>
+      {% if appt.completed == -1 %} Registered
+      {% elif appt.completed == 0 %} In Queue
+      {% elif appt.completed == 1 %} Completed
+      {% elif appt.completed == 2 %} Cancelled
+      {% else %} —
+      {% endif %}
+    </td>
+    <td>{{ appt.token_num }}</td>
+    <td>
+      {% if appt.payment %} ₹{{ appt.payment.total_amount|floatformat:2 }} {% else %} — {% endif %}
+    </td>
+    <td class="d-grid gap-1">
+  <a class="btn btn-outline-primary btn-sm" href="{% url 'patients:edit' patient.id %}">Edit</a>
+  {% if appt.id %}
+    <a class="btn btn-outline-success btn-sm" href="{% url 'patients:cash_receipt_pdf' appt.id %}" target="_blank">
+      Print Receipt
+    </a>
+    <a class="btn btn-outline-secondary btn-sm" href="{% url 'patients:token_pdf' appt.id %}" target="_blank">
+      Print Token
+    </a>
+  {% endif %}
+</td>
+
+  </tr>
+  {% empty %}
+  <tr>
+    <td colspan="6" class="text-center text-muted">No appointments found.</td>
+  </tr>
+  {% endfor %}
+</tbody>
+
+    </table>
+  </div>
+</div>
+{% endblock %}

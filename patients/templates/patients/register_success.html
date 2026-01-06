@@ -1,0 +1,32 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <title>Receipt & Token</title>
+  <style>
+    /* Minimal styling for print layout */
+    .section { margin-bottom: 2rem; }
+    .header { text-align: center; font-weight: bold; }
+    .key { display: inline-block; width: 120px; font-weight: bold; }
+  </style>
+</head>
+<body onload="window.print()">
+  <!-- Cash Receipt -->
+  <div class="section">
+    <div class="header">Cash Receipt</div>
+    <p><span class="key">Hospital:</span> {{ request.user.hospital.name }}</p>
+    <p><span class="key">Date:</span> {{ payment.paid_on }}</p>
+    <p><span class="key">Patient:</span> {{ patient.patient_name }}</p>
+    <p><span class="key">Mobile:</span> {{ contact.mobile_num }}</p>
+    <p><span class="key">Total Paid:</span> ₹{{ payment.total_amount }}</p>
+  </div>
+
+  <!-- Queue Token -->
+  <div class="section">
+    <div class="header">Queue Token</div>
+    <p><span class="key">Token No:</span> {{ appointment.token_num }}</p>
+    <p><span class="key">Doctor:</span> Dr. {{ appointment.doctor.get_full_name }}</p>
+    <p><span class="key">Position:</span> {{ appointment.que_pos }}</p>
+    <p><span class="key">ETA:</span> {{ appointment.eta }}</p>
+  </div>
+</body>
+</html>

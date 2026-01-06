@@ -1,0 +1,131 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Hospital Cash Receipt</title>
+  <style>
+    body {
+      font-family: Arial, sans-serif;
+      background: #f8f9fa;
+      padding: 20px;
+    }
+    .receipt {
+      max-width: 500px;
+      margin: auto;
+      background: #fff;
+      padding: 20px;
+      border: 2px solid #333;
+      border-radius: 8px;
+    }
+    .header {
+      text-align: center;
+      margin-bottom: 20px;
+    }
+    .header h2 {
+      margin: 0;
+    }
+    .info {
+      margin-bottom: 15px;
+      font-size: 14px;
+    }
+    .info strong {
+      display: inline-block;
+      width: 120px;
+    }
+    table {
+      width: 100%;
+      border-collapse: collapse;
+      margin-top: 10px;
+    }
+    table, th, td {
+      border: 1px solid #333;
+    }
+    th, td {
+      padding: 8px;
+      text-align: left;
+    }
+    .total {
+      text-align: right;
+      font-weight: bold;
+    }
+    .footer {
+      text-align: center;
+      margin-top: 20px;
+      font-size: 13px;
+    }
+    .btn-print {
+      display: block;
+      width: 100%;
+      padding: 10px;
+      margin-top: 20px;
+      background: #007bff;
+      color: #fff;
+      border: none;
+      cursor: pointer;
+      border-radius: 5px;
+      font-size: 16px;
+    }
+    .btn-print:hover {
+      background: #0056b3;
+    }
+  </style>
+</head>
+<body>
+  <div class="receipt">
+    <div class="header">
+      <h2>City Care Hospital</h2>
+      <p>123 Main Street, New Delhi, India</p>
+      <p>Phone: +91-9876543210</p>
+      <hr>
+      <h3>CASH RECEIPT</h3>
+    </div>
+
+    <div class="info">
+      <p><strong>Patient Name:</strong> John Doe</p>
+      <p><strong>Doctor Name:</strong> Dr. Smith</p>
+      <p><strong>Date:</strong> <span id="date"></span></p>
+    </div>
+
+    <table>
+      <thead>
+        <tr>
+          <th>Service</th>
+          <th>Amount (₹)</th>
+        </tr>
+      </thead>
+      <tbody>
+        <tr>
+          <td>Consultation</td>
+          <td>500</td>
+        </tr>
+        <tr>
+          <td>Blood Test</td>
+          <td>800</td>
+        </tr>
+        <tr>
+          <td>X-Ray</td>
+          <td>1000</td>
+        </tr>
+      </tbody>
+      <tfoot>
+        <tr>
+          <td class="total">Total</td>
+          <td class="total">2300</td>
+        </tr>
+      </tfoot>
+    </table>
+
+    <div class="footer">
+      <p>Thank you for your visit 🙏</p>
+    </div>
+
+    <button class="btn-print" onclick="window.print()">🖨 Print Receipt</button>
+  </div>
+
+  <script>
+    // Auto insert today’s date
+    document.getElementById("date").innerText = new Date().toLocaleDateString();
+  </script>
+</body>
+</html>

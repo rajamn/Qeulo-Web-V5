@@ -1,0 +1,99 @@
+<!DOCTYPE html>
+<html>
+  <head>
+    <meta charset="utf-8" />
+    <style>
+      @page { size: {{ pagesize }}; margin: 5mm; }
+
+      body {
+        font-family: "Helvetica", Arial, sans-serif;
+        font-size: 11pt;
+        margin: 0;
+        padding: 0;
+        text-align: center;
+      }
+
+      .toolbar {
+        margin: 12px auto;
+        padding: 10px 12px;
+        border: 1px solid #bbb;
+        border-radius: 6px;
+        background: #f7f7f7;
+        font-size: 12px;
+        width: fit-content;
+      }
+      .toolbar form { display: flex; gap: 10px; align-items: center; flex-wrap: wrap; }
+      .toolbar label { font-weight: 600; }
+      .toolbar select, .toolbar input, .toolbar button { font-size: 12px; padding: 4px 8px; }
+
+      .token-box {
+        border: 1px dashed #000;
+        padding: 8px 12px;
+        display: inline-block;
+        width: 100%;
+        box-sizing: border-box;
+        text-align: left;
+      }
+      .hospital-name { 
+        font-size: 12pt; 
+        font-weight: bold; 
+        margin-bottom: 8px;
+        text-align: center;
+      }
+      h1 { margin: 8px 0 4px; font-size: 22pt; text-align: center; }
+      p { margin: 4px 0; font-size: 11pt; line-height: 1.3; }
+    </style>
+  </head>
+
+  <body>
+    {% if not for_pdf %}
+    <div class="toolbar">
+      <form method="get" action="{% url 'token_pdf' appointment_id %}">
+        <label for="format">Format</label>
+        <select id="format" name="format" onchange="toggleFields(this.value)">
+          <option value="slip" {% if format == 'slip' %}selected{% endif %}>Thermal slip (80 mm)</option>
+          <option value="a5" {% if format == 'a5' %}selected{% endif %}>A5 sheet</option>
+        </select>
+
+        <span id="slip-fields" {% if format != 'slip' %}style="display:none"{% endif %}>
+          <label for="height_mm">Height (mm)</label>
+          <input type="number" min="50" max="200" step="5" id="height_mm" name="height_mm" value="{{ height_mm }}">
+        </span>
+
+        <span id="a5-fields" {% if format != 'a5' %}style="display:none"{% endif %}>
+          <label for="orientation">Orientation</label>
+          <select id="orientation" name="orientation">
+            <option value="portrait" {% if orientation == 'portrait' %}selected{% endif %}>Portrait</option>
+            <option value="landscape" {% if orientation == 'landscape' %}selected{% endif %}>Landscape</option>
+          </select>
+        </span>
+
+        <button type="submit">Generate PDF</button>
+        <a href="{% url 'token_preview' appointment_id %}?format={{ format }}&height_mm={{ height_mm }}&orientation={{ orientation }}" style="text-decoration:none">
+          Preview
+        </a>
+      </form>
+    </div>
+
+    <script>
+      function toggleFields(fmt) {
+        document.getElementById('slip-fields').style.display = (fmt === 'slip') ? '' : 'none';
+        document.getElementById('a5-fields').style.display   = (fmt === 'a5')   ? '' : 'none';
+      }
+    </script>
+    {% endif %}
+
+    <div class="token-box">
+      <div class="hospital-name">{{ hospital.hospital_name|default:"Hospital Name" }}</div>
+      <p><strong>Date:</strong> {{ appt_date|date:"d-m-Y" }}</p>
+      <p><strong>Doctor:</strong> {{ doctor.doctor_name|default:"-" }}</p>
+      <p><strong>Patient ID:</strong> {{ patient.patient_code }}</p>
+      <p><strong>Patient:</strong> {{ patient.patient_name|default:"-" }}</p>
+      <p><strong>Age:</strong> {{ age_display|default:"-" }} &nbsp; | &nbsp;
+         <strong>Gender:</strong> {{ gender|default:"-" }}
+      </p>
+      <p><strong>Queue Position:</strong> {{ que_pos|default:"-" }}</p>
+      <h1>Token #{{ token }}</h1>
+    </div>
+  </body>
+</html>

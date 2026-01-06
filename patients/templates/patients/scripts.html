@@ -1,0 +1,55 @@
+<script>
+document.addEventListener("DOMContentLoaded", function () {
+  // 🔄 Contact → Patient name sync
+  const contactInput = document.getElementById("contact_name");
+  const patientInput = document.getElementById("patient_name");
+  const sameChk      = document.getElementById("same_as_contact");
+
+  if (contactInput && patientInput && sameChk) {
+    sameChk.addEventListener("change", () => {
+      patientInput.value = sameChk.checked ? contactInput.value : "";
+    });
+    contactInput.addEventListener("input", () => {
+      if (sameChk.checked) {
+        patientInput.value = contactInput.value;
+      }
+    });
+  }
+
+  // 💰 Total billing amount
+  const amountFields = document.querySelectorAll('.amount-field');
+  const totalSpan    = document.getElementById('total_amount');
+
+  function updateTotal() {
+    let total = 0;
+    amountFields.forEach(input => {
+      const val = parseFloat(input.value);
+      if (!isNaN(val)) total += val;
+    });
+    if (totalSpan) totalSpan.textContent = total.toFixed(2);
+  }
+  amountFields.forEach(input => input.addEventListener('input', updateTotal));
+  updateTotal();
+
+  // ⏱️ ETA Fetch on Doctor change
+  const doctorSelect = document.getElementById("id_appointment-doctor");
+  const etaDisplay   = document.getElementById("eta-value");
+
+  if (doctorSelect && etaDisplay) {
+    doctorSelect.addEventListener("change", function () {
+      const doctorId = this.value;
+      etaDisplay.textContent = "--";
+      if (doctorId) {
+        fetch(`/get-eta/?doctor_id=${encodeURIComponent(doctorId)}`)
+          .then(response => response.json())
+          .then(data => {
+            etaDisplay.textContent = data.eta || "Unavailable";
+          })
+          .catch(() => {
+            etaDisplay.textContent = "Unavailable";
+          });
+      }
+    });
+  }
+});
+</script>

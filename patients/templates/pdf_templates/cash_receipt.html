@@ -1,0 +1,169 @@
+{% load tz %}
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <title>Cash Receipt</title>
+  <style type="text/css">
+    /* ===== Page definitions ===== */
+    @page a5-portrait   { size: A5 portrait;   margin: 10mm; }
+    @page a5-landscape  { size: A5 landscape;  margin: 10mm; }
+    @page a4-portrait   { size: A4 portrait;   margin: 10mm; }
+    @page a4-landscape  { size: A4 landscape;  margin: 10mm; }
+    @page letter-portrait  { size: Letter portrait;  margin: 10mm; }
+    @page letter-landscape { size: Letter landscape; margin: 10mm; }
+
+    body.a5-portrait   { page: a5-portrait; }
+    body.a5-landscape  { page: a5-landscape; }
+    body.a4-portrait   { page: a4-portrait; }
+    body.a4-landscape  { page: a4-landscape; }
+    body.letter-portrait  { page: letter-portrait; }
+    body.letter-landscape { page: letter-landscape; }
+
+    /* ===== Thermal 80mm roll ===== */
+    @page roll80 { size: 80mm auto; margin: 4mm; }
+    body.roll80-portrait,
+    body.roll80-landscape { page: roll80; }
+
+    /* ===== Thermal compact tweaks ===== */
+    body[class^="roll80"] .header { border-bottom: 1px solid #666; margin-bottom: 8px; padding-bottom: 6px; }
+    body[class^="roll80"] .brand { font-size: 13pt; }
+    body[class^="roll80"] .addr-line,
+    body[class^="roll80"] .contact-line,
+    body[class^="roll80"] .meta { font-size: 9pt; }
+    body[class^="roll80"] table.details td { padding: 2px 0; font-size: 9.5pt; }
+    body[class^="roll80"] table.items th,
+    body[class^="roll80"] table.items td { padding: 4px 4px; font-size: 9pt; }
+    body[class^="roll80"] .amount-box { margin-top: 8px; padding: 6px; border: 1px dashed #444; }
+    body[class^="roll80"] .amount-value { font-size: 12pt; }
+    body[class^="roll80"] .toolbar { display: none !important; }
+
+    html, body { margin:0; padding:0; }
+    body { font-family: Helvetica, Arial, sans-serif; font-size: 11pt; color:#111; }
+
+    .header { text-align:left; border-bottom:2px solid #666; padding-bottom:8px; margin-bottom:14px; }
+    .brand { margin:0; font-size:18pt; line-height:1.2; }
+    .addr-line, .contact-line { font-size:10pt; color:#333; }
+    .meta { margin-top:10px; padding:8px 10px; border:1px solid #bbb; background:#f7f7f7; border-radius:4px; }
+
+    table.details { width:100%; border-collapse:collapse; table-layout:fixed; margin-top:12px; page-break-inside:avoid; }
+    table.details td { padding:4px 6px; font-size:11pt; vertical-align:top; }
+    .label { font-weight:bold; width:32%; white-space:nowrap; }
+    .value { width:68%; word-wrap:break-word; overflow-wrap:break-word; }
+
+    table.items { width:100%; border-collapse:collapse; margin-top:12px; page-break-inside:avoid; }
+    table.items th, table.items td { border:1px solid #bbb; padding:6px 8px; font-size:10.5pt; text-align:left; }
+    table.items th { background:#fafafa; }
+    table.items tfoot td { font-weight:700; text-align:right; }
+
+    .amount-box { margin-top:12px; padding:10px; border:1px solid #444; background:#fafafa; border-radius:4px; }
+    .amount-label { font-weight:bold; }
+    .amount-value { font-size:14pt; font-weight:bold; }
+
+    .toolbar { margin:8px 0 16px; padding:8px 10px; border:1px solid #bbb; background:#f7f7f7; border-radius:6px; font-size:12px; }
+    .toolbar form { display:inline-block; }
+    .toolbar label { font-weight:600; margin-right:6px; }
+    .toolbar select, .toolbar button { font-size:12px; padding:4px 8px; }
+    @media print { .toolbar { display:none !important; } }
+
+    .footer-note { font-size:9pt; color:#555; text-align:right; margin-top:12px; }
+  </style>
+</head>
+
+<body class="{{ pagesize|default:'a5'|lower }}-{{ orientation|default:'portrait' }}">
+  {% if not for_pdf %}
+  <div class="toolbar">
+    <form method="get" action="{% url 'patients:cash_receipt_pdf' appointment_id %}">
+      <label for="pagesize">Paper</label>
+      <select id="pagesize" name="pagesize">
+        <option value="A5"     {% if pagesize == "A5" or not pagesize %}selected{% endif %}>A5</option>
+        <option value="A4"     {% if pagesize == "A4" %}selected{% endif %}>A4</option>
+        <option value="Letter" {% if pagesize == "Letter" %}selected{% endif %}>Letter</option>
+        <option value="ROLL80" {% if pagesize == "ROLL80" %}selected{% endif %}>80mm Roll (Thermal)</option>
+      </select>
+
+      <label for="orientation">Orientation</label>
+      <select id="orientation" name="orientation">
+        <option value="portrait"  {% if orientation == "portrait" or not orientation %}selected{% endif %}>Portrait</option>
+        <option value="landscape" {% if orientation == "landscape" %}selected{% endif %}>Landscape</option>
+      </select>
+
+      <button type="submit">Generate PDF</button>
+    </form>
+  </div>
+  {% endif %}
+
+  <!-- ===== Header ===== -->
+  <div class="header">
+    <h2 class="brand">{{ hospital.hospital_name|default:"Hospital Name" }}</h2>
+    <div class="addr-line">
+      {% if hospital.street %}{{ hospital.street }}{% endif %}
+      {% if hospital.city %}{% if hospital.street %}, {% endif %}{{ hospital.city }}{% endif %}
+      {% if hospital.state %}{% if hospital.street or hospital.city %}, {% endif %}{{ hospital.state }}{% endif %}
+      {% if hospital.pincode %}{% if hospital.street or hospital.city or hospital.state %} - {% endif %}{{ hospital.pincode }}{% endif %}
+    </div>
+    <div class="contact-line">
+      {% if hospital.phone_num %}Phone: {{ hospital.phone_num }}{% endif %}
+      {% if hospital.email %}{% if hospital.phone_num %} | {% endif %}Email: {{ hospital.email }}{% endif %}
+    </div>
+    <div class="meta">
+      <strong>Date:</strong> {{ payment.paid_on|date:"d-m-Y"|default:now|date:"d-m-Y" }}
+      &#160;&#160;&#160; <strong>Receipt No:</strong> {{ receipt_no|default:"-" }}
+    </div>
+  </div>
+
+  <!-- ===== Patient / Doctor ===== -->
+  <table class="details">
+    <tbody>
+      <tr><td class="label">Patient id</td><td class="value">Patient ID: {{ patient.patient_code }}</td></tr>
+      <tr><td class="label">Patient Name</td><td class="value">{{ patient.patient_name|default:"-" }}</td></tr>
+      <tr><td class="label">Age</td><td class="value">{{ age_display|default:"-" }}</td></tr>
+      <tr><td class="label">Gender</td><td class="value">{{ gender|default:"-" }}</td></tr>
+      <tr><td class="label">Doctor</td><td class="value">{{ doctor.doctor_name|default:"-" }}</td></tr>
+      {% if payment and payment.pay_type %}
+      <tr><td class="label">Payment Mode</td><td class="value">{{ payment.pay_type|default:"-" }}</td></tr>
+      {% endif %}
+    </tbody>
+  </table>
+
+  <!-- ===== Line Items ===== -->
+  {% if txns %}
+  <table class="items">
+    <thead>
+      <tr><th>Service</th><th>Amount (₹)</th></tr>
+    </thead>
+    <tbody>
+      {% for t in txns %}
+      <tr>
+        <td>{{ t.service.service_name|default:"Service" }}</td>
+        <td>{{ t.amount|floatformat:2|default:"0.00" }}</td>
+      </tr>
+      {% endfor %}
+    </tbody>
+    <tfoot>
+      <tr><td>Total</td><td>{{ total_amount|floatformat:2|default:"0.00" }}</td></tr>
+    </tfoot>
+  </table>
+  {% endif %}
+
+  <!-- ===== Amount & Notes ===== -->
+  <div class="amount-box">
+    <span class="amount-label">Amount Received:</span>
+    &#160;<span class="amount-value">₹{{ amount|floatformat:2|default:"0.00" }}</span>
+  </div>
+
+  {% if amount_in_words %}
+  <p class="addr-line"><strong>In Words:</strong> {{ amount_in_words }}</p>
+  {% endif %}
+
+  <p class="addr-line">Thank you for your payment!</p>
+  {% if consult_message %}
+  <hr style="border:none;border-top:1px solid #e5e7eb;margin:10px 0 6px;">
+  <p style="margin:4px 0 0; font-size:11px; color:#6b7280;">
+    <strong>{{ consult_message }}</strong>
+  </p>
+  {% endif %}
+
+  <div class="footer-note">Authorized Signature</div>
+</body>
+</html>
