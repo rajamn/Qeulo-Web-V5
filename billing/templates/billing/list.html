@@ -1,0 +1,134 @@
+{% extends "base_sidebar.html" %}
+{% block title %}Billing{% endblock %}
+{% block content %}
+
+<div class="container mt-4">
+  <div class="d-flex justify-content-between align-items-center mb-3">
+    <h3 class="mb-0"><i class="bi bi-receipt"></i> Billing</h3>
+    <a class="btn btn-success" href="{% url 'billing:new' %}">New Bill</a>
+  </div>
+
+  <!-- Search bar -->
+  <form method="get" id="billSearchForm" class="mb-3 position-relative" autocomplete="off">
+    <div class="row g-2 align-items-end">
+      <div class="col-md-6">
+        <label class="form-label">Search Patient (name or mobile)</label>
+        <div class="position-relative" id="patientWrap">
+          <input id="patientSearch" name="q" type="text" class="form-control"
+                 placeholder="Type at least 3 letters or 3 digits" value="{{ q|default:'' }}">
+          <div id="patientResults"
+               class="list-group position-absolute w-100 shadow-sm d-none"
+               style="z-index:1000; max-height:260px; overflow:auto;"></div>
+        </div>
+        <!-- selected patient id (set by JS on pick) -->
+        <input type="hidden" name="patient" id="patientId" value="{{ selected_patient }}">
+      </div>
+      <div class="col-auto">
+        <button class="btn btn-primary" type="submit">Search</button>
+        <a class="btn btn-outline-secondary" href="{% url 'billing:list' %}">Clear</a>
+      </div>
+    </div>
+  </form>
+
+  <table class="table table-sm table-striped table-hover align-middle">
+    <thead>
+      <tr><th>#</th><th>Date</th><th>Patient</th><th class="text-end">Total</th><th></th></tr>
+    </thead>
+    <tbody>
+    {% for b in bills %}
+      <tr>
+        <td>{{ b.id }}</td>
+        <td>{{ b.paid_on }}</td>
+        <td>{{ b.patient }}</td>
+        <td class="text-end">₹ {{ b.total_amount }}</td>
+        <td class="text-nowrap">
+          <a class="btn btn-outline-secondary btn-sm" href="{% url 'billing:receipt' b.pk %}" target="_blank">View / Print</a>
+          <a class="btn btn-outline-primary btn-sm" href="{% url 'billing:edit' b.pk %}">Edit</a>
+
+        </td>
+      </tr>
+    {% empty %}
+      <tr><td colspan="5" class="text-center text-muted">No bills yet.</td></tr>
+    {% endfor %}
+    </tbody>
+  </table>
+</div>
+
+<script>
+/* ---- Config ---- */
+const MIN_NAME_CHARS = 3;
+const MIN_MOBILE_PREFIX = 3;
+
+/* ---- Elements ---- */
+const $form    = document.getElementById("billSearchForm");
+const $wrap    = document.getElementById("patientWrap");
+const $search  = document.getElementById("patientSearch");
+const $results = document.getElementById("patientResults");
+const $pid     = document.getElementById("patientId");
+
+let timer = null;
+
+function clearResults() {
+  $results.innerHTML = "";
+  $results.classList.add("d-none");
+}
+
+function selectPatient(p) {
+  // Set selected patient id, clear text query, submit
+  if ($pid) $pid.value = p.id;
+  if ($search) $search.value = p.name + (p.mobile ? ` (${p.mobile})` : "");
+  // ensure only patient filter is used
+  const qInput = $form.querySelector('input[name="q"]');
+  if (qInput) qInput.value = "";
+  clearResults();
+  $form.submit();
+}
+
+$search.addEventListener("input", () => {
+  // typing implies free-text search; clear patient filter
+  if ($pid) $pid.value = "";
+
+  clearTimeout(timer);
+  const raw = $search.value.trim();
+  if (!raw) { clearResults(); return; }
+
+  const digits = raw.replace(/\D/g, "");
+  const hasEnoughName   = raw.replace(/\d+/g, "").trim().length >= MIN_NAME_CHARS;
+  const hasEnoughMobile = digits.length >= MIN_MOBILE_PREFIX;
+
+  if (!hasEnoughName && !hasEnoughMobile) { clearResults(); return; }
+
+  timer = setTimeout(async () => {
+    try {
+      const r = await fetch("{% url 'billing:patient_search' %}?q=" + encodeURIComponent(raw),
+                            { headers: { "X-Requested-With": "XMLHttpRequest" }});
+      if (!r.ok) throw new Error("HTTP " + r.status);
+      const json = await r.json();
+
+      clearResults();
+      if (Array.isArray(json.results) && json.results.length) {
+        for (const p of json.results) {
+          const a = document.createElement("a");
+          a.href = "javascript:void(0)";
+          a.className = "list-group-item list-group-item-action";
+          a.innerHTML = `<div class="d-flex justify-content-between">
+                           <span>${p.name}</span>
+                           <small class="text-muted">${p.mobile || ""}</small>
+                         </div>`;
+          a.addEventListener("click", () => selectPatient(p));
+          $results.appendChild(a);
+        }
+        $results.classList.remove("d-none");
+      }
+    } catch (_) {
+      clearResults();
+    }
+  }, 200);
+});
+
+// close suggestions if clicking outside
+document.addEventListener("click", (e) => {
+  if ($wrap && !$wrap.contains(e.target)) clearResults();
+});
+</script>
+{% endblock %}

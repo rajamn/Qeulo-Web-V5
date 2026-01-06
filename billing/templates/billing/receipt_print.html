@@ -1,0 +1,187 @@
+{% load tz %}
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <title>Cash Receipt</title>
+  <style type="text/css">
+    /* ===== Page ===== */
+    @page a5-portrait   { size: A5 portrait;   margin: 10mm; }
+    @page a5-landscape  { size: A5 landscape;  margin: 10mm; }
+    @page a4-portrait   { size: A4 portrait;   margin: 10mm; }
+    @page a4-landscape  { size: A4 landscape;  margin: 10mm; }
+    @page letter-portrait  { size: Letter portrait;  margin: 10mm; }
+    @page letter-landscape { size: Letter landscape; margin: 10mm; }
+
+    body.a5-portrait   { page: a5-portrait; }
+    body.a5-landscape  { page: a5-landscape; }
+    body.a4-portrait   { page: a4-portrait; }
+    body.a4-landscape  { page: a4-landscape; }
+    body.letter-portrait  { page: letter-portrait; }
+    body.letter-landscape { page: letter-landscape; }
+
+    html, body { margin:0; padding:0; }
+    body { font-family: Helvetica, Arial, sans-serif; font-size: 11pt; color:#111; }
+
+    .header { text-align:left; border-bottom:2px solid #666; padding-bottom:8px; margin-bottom:14px; }
+    .brand { margin:0; font-size:18pt; line-height:1.2; }
+    .addr-line, .contact-line { font-size:10pt; color:#333; }
+    .meta { margin-top:10px; padding:8px 10px; border:1px solid #bbb; background:#f7f7f7; border-radius:4px; }
+
+    table.details { width:100%; border-collapse:collapse; table-layout:fixed; margin-top:12px; }
+    table.details td { padding:4px 6px; font-size:11pt; vertical-align:top; }
+    .label { font-weight:bold; width:32%; white-space:nowrap; }
+    .value { width:68%; word-wrap:break-word; overflow-wrap:break-word; }
+
+    table.items { width:100%; border-collapse:collapse; margin-top:12px; }
+    table.items th, table.items td { border:1px solid #bbb; padding:6px 8px; font-size:10.5pt; text-align:left; }
+    table.items th { background:#fafafa; }
+    table.items tfoot td { font-weight:700; }
+    table, tr, td, th, tbody, thead, tfoot {
+      page-break-inside: avoid !important;
+    }
+
+    .amount-box, .meta, .header {
+      page-break-inside: avoid !important;
+      page-break-before: auto !important;
+      page-break-after: auto !important;
+    }
+
+    .amount-box { margin-top:12px; padding:10px; border:1px solid #444; background:#fafafa; border-radius:4px; }
+    .amount-label { font-weight:bold; }
+    .amount-value { font-size:14pt; font-weight:bold; }
+
+    .toolbar { margin:8px 0 16px; padding:8px 10px; border:1px solid #bbb; background:#f7f7f7; border-radius:6px; font-size:12px; }
+    .toolbar form { display:inline-block; }
+    .toolbar label { font-weight:600; margin-right:6px; }
+    .toolbar select, .toolbar button { font-size:12px; padding:4px 8px; }
+    body {overflow: visible;}
+    @media print { .toolbar { display:none !important; } }
+    @media print {html, body {height: auto;margin: 0;padding: 0;}}
+  </style>
+</head>
+
+<body class="{{ pagesize|default:'A5'|lower }}-{{ orientation|default:'portrait' }}">
+  {% if not for_pdf %}
+    <div class="toolbar">
+      <!-- Reload same view with paper/orientation choices -->
+      <form method="get" action="{% url 'billing:receipt' bill_pk %}">
+        <input type="hidden" name="inline" value="1" />
+        <label for="pagesize">Paper</label>
+        <select id="pagesize" name="pagesize">
+          <option value="A5" {% if pagesize == "A5" or pagesize is not defined %}selected{% endif %}>A5</option>
+          <option value="A4" {% if pagesize == "A4" %}selected{% endif %}>A4</option>
+          <option value="Letter" {% if pagesize == "Letter" %}selected{% endif %}>Letter</option>
+        </select>
+
+        <label for="orientation">Orientation</label>
+        <select id="orientation" name="orientation">
+          <option value="portrait" {% if orientation == "portrait" or orientation is not defined %}selected{% endif %}>Portrait</option>
+          <option value="landscape" {% if orientation == "landscape" %}selected{% endif %}>Landscape</option>
+        </select>
+
+        <button type="submit">Apply</button>
+      </form>
+
+      <!-- One-click print -->
+      <button type="button" onclick="window.print()">Print</button>
+    </div>
+    {% endif %}
+
+  <!-- Header -->
+  <div class="header">
+    <h2 class="brand">{{ hospital.hospital_name }}</h2>
+
+    <div class="addr-line">
+      {% if hospital.street %}{{ hospital.street }}{% endif %}
+      {% if hospital.city %}{% if hospital.street %}, {% endif %}{{ hospital.city }}{% endif %}
+      {% if hospital.state %}{% if hospital.street or hospital.city %}, {% endif %}{{ hospital.state }}{% endif %}
+      {% if hospital.pincode %}{% if hospital.street or hospital.city or hospital.state %} - {% endif %}{{ hospital.pincode }}{% endif %}
+    </div>
+
+    <div class="contact-line">
+      {% if hospital.phone_num %}Phone: {{ hospital.phone_num }}{% endif %}
+      {% if hospital.email %}{% if hospital.phone_num %} | {% endif %}Email: {{ hospital.email }}{% endif %}
+    </div>
+
+    <div class="meta">
+      <strong>Date:</strong>
+      {% if payment and payment.paid_on %}{{ payment.paid_on|date:"d-m-Y" }}{% else %}{{ now|date:"d-m-Y" }}{% endif %}
+      &#160;&#160;&#160; <strong>Receipt No:</strong> {{ receipt_no }}
+    </div>
+  </div>
+
+  <!-- Patient/Doctor -->
+  <table class="details">
+    <tbody>
+      <tr>
+        <td class="label">Patient id</td>
+        <td class="value">  Patient ID: {{ bill.patient.patient_code }}</td>
+      </tr>
+      <tr>
+        <td class="label">Patient Name</td>
+        <td class="value">{{ patient.patient_name }}</td>
+      </tr>
+      <tr>
+        <td class="label">Doctor</td>
+        <td class="value">
+          {% if doctor %}{{ doctor.doctor_name|default:doctor }}{% else %}-{% endif %}
+        </td>
+      </tr>
+      {% if payment and payment.pay_type %}
+      <tr>
+        <td class="label">Payment Mode</td>
+        <td class="value">{{ payment.pay_type }}</td>
+      </tr>
+      {% endif %}
+    </tbody>
+  </table>
+
+  <!-- Line items -->
+  {% if txns %}
+  <table class="items">
+    <thead>
+      <tr>
+        <th style="width:68%;">Service</th>
+        <th style="width:32%;">Amount (₹)</th>
+      </tr>
+    </thead>
+    <tbody>
+      {% for t in txns %}
+      <tr>
+        <td>{{ t.service.service_name|default:t.service|default:"-" }}</td>
+        <td>{{ t.amount|floatformat:2 }}</td>
+      </tr>
+      {% endfor %}
+    </tbody>
+    <tfoot>
+      <tr>
+        <td style="text-align:right;">Total</td>
+        <td>{{ total_amount|floatformat:2 }}</td>
+      </tr>
+    </tfoot>
+  </table>
+  {% endif %}
+
+  <!-- Amount highlight -->
+  <div class="amount-box">
+    <span class="amount-label">Amount Received:</span>
+    &#160;<span class="amount-value">₹{{ amount|floatformat:2 }}</span>
+  </div>
+
+  {% if amount_in_words %}
+    <p class="addr-line"><strong>In Words:</strong> {{ amount_in_words }}</p>
+  {% endif %}
+
+  <p class="addr-line">Thank you for your payment!</p>
+  {% if request.GET.auto %}
+<script>
+  // Auto-trigger print once the page is fully painted.
+  window.addEventListener('load', function () {
+    // Small timeout helps on some browsers before the print dialog
+    setTimeout(function(){ window.print(); }, 50);
+  });
+</script>
+{% endif %}
+</body>
+</html>

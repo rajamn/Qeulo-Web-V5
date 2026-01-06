@@ -1,0 +1,656 @@
+# billing/views.py
+import csv
+import logging
+from decimal import Decimal
+from io import BytesIO
+from datetime import date, datetime, timedelta, time
+
+from django.contrib import messages
+from django.contrib.auth.decorators import login_required
+from django.db import IntegrityError, transaction
+from django.db.models import (
+    Sum, F, Case, When, Value, DecimalField, Q
+)
+from django.http import JsonResponse, HttpResponse
+from django.shortcuts import get_object_or_404, redirect, render
+from django.template.loader import render_to_string
+from django.urls import reverse
+from django.utils.dateparse import parse_date
+
+from weasyprint import HTML
+
+from core.decorators import role_required
+from patients.models import Patient
+from services.models import Service
+from appointments.models import AppointmentDetails
+from doctors.models import Doctor
+from .forms import PaymentMasterForm, PaymentTransactionFormSet, limit_tx_queryset
+from .models import PaymentMaster, PaymentTransaction
+from .utils import (
+    _parse_range, _parse_range_qp, _get_patient_mobile, pdf_supported, 
+    _receipt_context, _mobile_prefix_range,get_patient_queryset,
+)
+from patients.models import Patient, Contact
+
+try:
+    from num2words import num2words
+except ImportError:
+    num2words = None
+
+logger = logging.getLogger(__name__)
+
+# -------------------------------------------------------------------
+# Helpers moved to utils
+# -------------------------------------------------------------------
+# Core Billing Views
+# -------------------------------------------------------------------
+
+@login_required
+@role_required("Reception", "Administrator","hospital_admin")
+def new_bill(request):
+    hospital = request.user.hospital
+
+    if request.method == "POST":
+        action = request.POST.get("action")
+        form = PaymentMasterForm(request.POST)
+        formset = PaymentTransactionFormSet(request.POST, prefix="transactions")
+        limit_tx_queryset(formset, hospital)
+
+        # 🧩 Get patient details (existing or new)
+        mobile_num = (request.POST.get("mobile_num") or "").strip()
+        patient_name = (request.POST.get("patient_name") or "").strip()
+        age_years = (request.POST.get("age_years") or "0").strip()
+        age_months = (request.POST.get("age_months") or "0").strip()
+        gender = (request.POST.get("gender") or "O").strip()
+        referred_by = (request.POST.get("referred_by") or "").strip()
+
+        # Validate basic patient data
+        if not mobile_num or not patient_name:
+            messages.error(request, "Please enter both patient name and mobile number.")
+            return render(
+                request,
+                "billing/new.html",
+                {
+                    "form": form,
+                    "formset": formset,
+                    "pdf_enabled": pdf_supported(),
+                },
+            )
+
+        # --- Fetch or create Contact ---
+        contact, _ = Contact.objects.get_or_create(
+            mobile_num=mobile_num,
+            hospital=hospital,
+            defaults={"contact_name": patient_name},
+        )
+
+        # --- Fetch or create Patient ---
+        patient, _ = Patient.objects.get_or_create(
+            contact=contact,
+            patient_name=patient_name,
+            hospital=hospital,
+            defaults={
+                "age_years": int(age_years or 0),
+                "age_months": int(age_months or 0),
+                "gender": gender,
+                "referred_by": referred_by or None,
+            },
+        )
+
+        # 🧮 Form validation checks
+        if not form.is_valid() or not formset.is_valid():
+            messages.error(request, "Please fix the highlighted errors and try again.")
+            return render(
+                request,
+                "billing/new.html",
+                {
+                    "form": form,
+                    "formset": formset,
+                    "pdf_enabled": pdf_supported(),
+                },
+            )
+
+        # ✅ Save payment and transactions atomically
+        try:
+            with transaction.atomic():
+                master = form.save(commit=False)
+                master.hospital = hospital
+                master.patient = patient
+                master.mobile_num = str(mobile_num)
+                master.collected_by = getattr(request.user, "display", None) or request.user.username
+                master.total_amount = Decimal("0.00")
+                master.save()
+
+                total = Decimal("0.00")
+                rows = formset.save(commit=False)
+                for r in rows:
+                    r.payment = master
+                    r.hospital = hospital
+                    r.patient = patient
+                    r.paid_on = master.paid_on
+                    r.save()
+                    total += (r.amount or Decimal("0.00"))
+
+                for d in formset.deleted_objects:
+                    d.delete()
+
+                master.total_amount = total
+                master.save(update_fields=["total_amount"])
+
+            messages.success(request, "Bill created successfully.")
+
+            if action == "print":
+                return redirect("billing:receipt", pk=master.pk)
+            return redirect("billing:list")
+
+        except IntegrityError as e:
+            messages.error(request, f"Error saving bill: {str(e)}")
+
+    else:  # GET
+        form = PaymentMasterForm()
+        formset = PaymentTransactionFormSet(prefix="transactions")
+        limit_tx_queryset(formset, hospital)
+
+    return render(
+        request,
+        "billing/new.html",
+        {
+            "form": form,
+            "formset": formset,
+            "pdf_enabled": pdf_supported(),
+        },
+    )
+
+
+@login_required
+@role_required("Reception", "Administrator", "hospital_admin")
+def edit_bill(request, pk: int):
+    hospital = request.user.hospital
+
+    master = get_object_or_404(
+        PaymentMaster.objects.select_related("patient", "hospital", "patient__contact")
+        .prefetch_related("transactions__service", "transactions__doctor"),
+        pk=pk,
+        hospital=hospital,
+    )
+
+    if request.method == "POST":
+        form = PaymentMasterForm(request.POST, instance=master)
+        formset = PaymentTransactionFormSet(
+            request.POST,
+            instance=master,
+            prefix="transactions",
+            form_kwargs={"hospital": hospital},
+        )
+        limit_tx_queryset(formset, hospital)
+
+        # 🧩 Patient fields (editable)
+        mobile_num = (request.POST.get("mobile_num") or "").strip()
+        patient_name = (request.POST.get("patient_name") or "").strip()
+        age_years = (request.POST.get("age_years") or "0").strip()
+        age_months = (request.POST.get("age_months") or "0").strip()
+        gender = (request.POST.get("gender") or "O").strip()
+        referred_by = (request.POST.get("referred_by") or "").strip()
+
+        if not patient_name or not mobile_num:
+            messages.error(request, "Please provide both patient name and mobile number.")
+        elif form.is_valid() and formset.is_valid():
+            try:
+                with transaction.atomic():
+                    # ✅ Update Contact
+                    contact = master.patient.contact
+                    if contact.mobile_num != mobile_num:
+                        contact.mobile_num = mobile_num
+                    if contact.contact_name != patient_name:
+                        contact.contact_name = patient_name
+                    contact.save()
+
+                    # ✅ Update Patient
+                    patient = master.patient
+                    patient.patient_name = patient_name
+                    patient.age_years = int(age_years or 0)
+                    patient.age_months = int(age_months or 0)
+                    patient.gender = gender
+                    patient.referred_by = referred_by or None
+                    patient.save()
+
+                    # ✅ Update PaymentMaster
+                    master = form.save(commit=False)
+                    master.hospital = hospital
+                    master.patient = patient
+                    master.mobile_num = str(mobile_num)
+                    master.save()
+
+                    # ✅ Update transactions
+                    total = Decimal("0.00")
+                    rows = formset.save(commit=False)
+                    for r in rows:
+                        r.payment = master
+                        r.hospital = hospital
+                        r.patient = patient
+                        r.paid_on = master.paid_on
+                        r.save()
+                        total += (r.amount or Decimal("0.00"))
+
+                    for d in formset.deleted_objects:
+                        d.delete()
+
+                    master.total_amount = total
+                    master.save(update_fields=["total_amount"])
+
+                    messages.success(request, "Bill and patient details updated successfully.")
+
+                    if request.POST.get("action") == "print":
+                        return redirect("billing:receipt", pk=master.pk)
+                    return redirect("billing:list")
+
+            except IntegrityError as e:
+                messages.error(request, f"Database integrity error: {str(e)}")
+
+        else:
+            messages.error(request, "Please correct the highlighted errors and try again.")
+    else:
+        form = PaymentMasterForm(instance=master)
+        formset = PaymentTransactionFormSet(
+            instance=master,
+            prefix="transactions",
+            form_kwargs={"hospital": hospital},
+        )
+        limit_tx_queryset(formset, hospital)
+
+    return render(
+        request,
+        "billing/new.html",
+        {
+            "form": form,
+            "formset": formset,
+            "is_edit": True,
+            "pdf_enabled": pdf_supported(),
+            "selected_patient_id": master.patient_id,
+            "selected_patient_display": f"{master.patient.patient_name} ({master.mobile_num or ''})".strip(),
+            "master": master,
+        },
+    )
+
+
+@login_required
+@role_required("Reception", "Administrator","hospital_admin")
+def bill_list(request):
+    hospital = request.user.hospital
+    q = (request.GET.get("q") or "").strip()
+    qs = PaymentMaster.objects.filter(hospital=hospital).select_related("patient")
+    if q:
+        qs = qs.filter(Q(patient__patient_name__icontains=q) | Q(mobile_num__icontains=q))
+    bills = qs.order_by("-paid_on", "-id")[:100]
+    return render(request, "billing/list.html", {"bills": bills, "q": q})
+
+@login_required
+def bill_receipt(request, pk: int):
+    ctx = _receipt_context(request, pk)
+    return render(request, "billing/receipt_print.html", ctx)
+
+@login_required
+@role_required("Reception", "Administrator","hospital_admin")
+def bill_receipt_pdf(request, pk: int):
+    ctx = _receipt_context(request, pk)
+    html_str = render_to_string("billing/receipt_print.html", ctx)
+    pdf_bytes = HTML(string=html_str, base_url=request.build_absolute_uri("/")).write_pdf()
+    resp = HttpResponse(pdf_bytes, content_type="application/pdf")
+    resp["Content-Disposition"] = f'inline; filename="receipt-{pk}.pdf"'
+    return resp
+
+
+
+
+# views.py
+@login_required
+@role_required("Reception", "Administrator","hospital_admin")
+def finance_dashboard(request):
+    hospital = request.user.hospital
+
+    # ----- Date window (inclusive) -----
+    today = date.today()
+    start_str = request.GET.get('start') or today.isoformat()
+    end_str   = request.GET.get('end')   or today.isoformat()
+    start = datetime.fromisoformat(start_str).date()
+    end   = datetime.fromisoformat(end_str).date()
+
+    # ----- Filters -----
+    doctor_id  = request.GET.get('doctor_id') or None
+    service_id = request.GET.get('service_id') or None
+    pay_type   = request.GET.get('pay_type') or None
+
+    doctors  = Doctor.objects.filter(hospital=hospital).order_by('doctor_name')
+    services = Service.objects.filter(hospital=hospital).order_by('service_name')
+
+    # ----- Base TXN queryset -----
+    txn_qs = (
+        PaymentTransaction.objects
+        .select_related('payment')
+        .filter(payment__hospital=hospital, payment__paid_on__range=(start, end))
+    )
+
+    if service_id:
+        txn_qs = txn_qs.filter(service_id=service_id)
+    if pay_type:
+        txn_qs = txn_qs.filter(pay_type=pay_type)
+
+    # ----- Queue counts from AppointmentDetails -----
+    appt_qs = AppointmentDetails.objects.filter(
+        hospital=hospital,
+        appointment_on__range=(start, end)
+    )
+    if doctor_id:
+        appt_qs = appt_qs.filter(doctor_id=doctor_id)
+        txn_qs  = txn_qs.filter(payment__appointmentdetails__doctor_id=doctor_id)
+
+
+    queue_counts = {
+        'total':      appt_qs.count(),
+        'registered': appt_qs.filter(completed=AppointmentDetails.STATUS_REGISTERED).count(),
+        'in_queue':   appt_qs.filter(completed=AppointmentDetails.STATUS_IN_QUEUE).count(),
+        'done':       appt_qs.filter(completed=AppointmentDetails.STATUS_DONE).count(),
+        'no_show':    appt_qs.filter(completed=AppointmentDetails.STATUS_NO_SHOW).count(),
+    }
+
+    # ----- Finance totals -----
+    total_amount = txn_qs.aggregate(s=Sum('amount'))['s'] or 0
+
+    # Amount-wise breakup
+    by_type_pairs = (
+        txn_qs
+        .values('pay_type')
+        .annotate(s=Sum('amount'))
+        .values_list('pay_type', 's')
+    )
+    by_type = {code: amt or 0 for code, amt in by_type_pairs}
+
+    # 🟢 Add Review count separately
+    review_count = txn_qs.filter(pay_type='Review').count()
+
+
+    # ----- KPIs -----
+    total_op = appt_qs.values('patient_id').distinct().count()
+    procedures_cnt = txn_qs.filter(service__category__iexact='procedure').count() if service_id else 0
+    consultations_cnt = txn_qs.filter(service__category__iexact='consultation').count() if service_id else 0
+    lab_cnt = txn_qs.filter(service__category__iexact='lab').count() if service_id else 0
+
+    # ----- Top doctors by revenue -----
+    top_doctors_qs = (
+    txn_qs.values(
+        doc_id=F('payment__appointmentdetails__doctor_id'),
+        doc_name=F('payment__appointmentdetails__doctor__doctor_name'),
+    )
+    .annotate(amount=Sum('amount'))
+    .filter(doc_id__isnull=False)
+    .order_by('-amount')[:10]
+    )
+
+    top_doctors = [{'id': r['doc_id'], 'name': r['doc_name'], 'amount': r['amount'] or 0}
+                   for r in top_doctors_qs]
+
+    # ----- Top services by revenue -----
+    top_services_qs = (
+        txn_qs.values(svc_id=F('service_id'), svc_name=F('service__service_name'))
+             .annotate(amount=Sum('amount'))
+             .filter(svc_id__isnull=False)
+             .order_by('-amount')[:10]
+    )
+    top_services = [{'id': r['svc_id'], 'name': r['svc_name'], 'amount': r['amount'] or 0}
+                    for r in top_services_qs]
+
+    context = {
+        'q': {
+            'start': start_str, 'end': end_str,
+            'doctor_id': doctor_id, 'service_id': service_id, 'pay_type': pay_type,
+        },
+        'doctors': doctors,
+        'services': services,
+        'pay_types': [
+            ('Cash', 'Cash'),
+            ('Card', 'Card'),
+            ('UPI', 'UPI'),
+            ('Due', 'Due'),
+            ('Review', 'Review'),
+            ('Other', 'Other'),
+        ],
+
+        'kpi': {
+            'total_op': total_op,
+            'total_amount': total_amount,
+            'procedures': procedures_cnt,
+            'consultations': consultations_cnt,
+            'lab': lab_cnt,
+        },
+        'queue': queue_counts,
+        'finance': {
+        'total': total_amount,
+        'by_type': {
+            'Cash': by_type.get('Cash', 0),
+            'UPI': by_type.get('UPI', 0),
+            'Card': by_type.get('Card', 0),
+            'Due': by_type.get('Due', 0),
+            'Other': by_type.get('Other', 0),
+        },
+        'review_count': review_count,
+    },
+
+        'top_doctors': top_doctors,
+        'top_services': top_services,
+    }
+    return render(request, 'billing/finance_dashboard.html', context)
+
+
+@login_required
+def api_finance_summary(request):
+    hospital = request.user.hospital
+    today = date.today()
+    today_total = PaymentTransaction.objects.filter(hospital=hospital, paid_on=today).aggregate(total=Sum("amount"))["total"] or 0
+    start_month = today.replace(day=1)
+    mtd = PaymentTransaction.objects.filter(hospital=hospital, paid_on__range=[start_month, today]).aggregate(total=Sum("amount"))["total"] or 0
+    start_30 = today - timedelta(days=29)
+    last30 = PaymentTransaction.objects.filter(hospital=hospital, paid_on__range=[start_30, today]).aggregate(total=Sum("amount"))["total"] or 0
+    return JsonResponse({"today_total": float(today_total), "mtd_total": float(mtd), "last30_total": float(last30)})
+
+@login_required
+def api_revenue_timeseries(request):
+    hospital = request.user.hospital
+    start, end = _parse_range(request)
+    qs = PaymentTransaction.objects.filter(hospital=hospital, paid_on__range=[start, end]).values("paid_on").annotate(total=Sum("amount")).order_by("paid_on")
+    bucket = {row["paid_on"]: float(row["total"]) for row in qs}
+    labels, data = [], []
+    day = start
+    while day <= end:
+        labels.append(day.isoformat())
+        data.append(bucket.get(day, 0))
+        day += timedelta(days=1)
+    return JsonResponse({"labels": labels, "data": data})
+
+@login_required
+def api_top_services(request):
+    hospital = request.user.hospital
+    start, end = _parse_range(request)
+    limit = int(request.GET.get("limit", 8))
+    qs = PaymentTransaction.objects.filter(hospital=hospital, paid_on__range=[start, end]).values("service__service_name").annotate(total=Sum("amount")).order_by("-total")[:limit]
+    labels = [r["service__service_name"] or "(Unnamed)" for r in qs]
+    data = [float(r["total"]) for r in qs]
+    return JsonResponse({"labels": labels, "data": data})
+
+@login_required
+def api_pay_type_split(request):
+    hospital = request.user.hospital
+    start, end = _parse_range(request)
+    qs = PaymentTransaction.objects.filter(hospital=hospital, paid_on__range=[start, end]).values("pay_type").annotate(total=Sum("amount")).order_by("pay_type")
+    labels = [r["pay_type"] or "Unknown" for r in qs]
+    data = [float(r["total"]) for r in qs]
+    return JsonResponse({"labels": labels, "data": data})
+
+@login_required
+def api_doctor_collections(request):
+    hospital = request.user.hospital
+    start, end = _parse_range(request)
+    qs = PaymentTransaction.objects.filter(hospital=hospital, paid_on__range=[start, end]).values("doctor__doctor_name").annotate(total=Sum("amount")).order_by("doctor__doctor_name")
+    labels = [r["doctor__doctor_name"] or "(No Doctor)" for r in qs]
+    data = [float(r["total"]) for r in qs]
+    return JsonResponse({"labels": labels, "data": data})
+
+@login_required
+def todays_collection(request, date_str=None):
+    the_date = parse_date(date_str) if date_str else date.today()
+    if the_date is None: the_date = date.today()
+    qs = PaymentTransaction.objects.filter(hospital=request.user.hospital, paid_on=the_date)
+    by_method = qs.values("pay_type").annotate(s=Sum("amount")).order_by("pay_type")
+    total = qs.aggregate(total=Sum("amount"))["total"] or Decimal("0.00")
+    return render(request, "billing/collection.html", {"date": the_date, "by_method": by_method, "total": total})
+
+@login_required
+def collections_doctors(request):
+    dfrom, dto = _parse_range_qp(request)
+    return render(request, "billing/collections_doctors.html", {
+        "dfrom": dfrom,
+        "dto": dto,
+        "pay_types": [label for _, label in PaymentTransaction.PAYMENT_CHOICES],
+    })
+
+@login_required
+def collections_doctors_data(request):
+    dfrom, dto = _parse_range_qp(request)
+    qs = PaymentTransaction.objects.filter(hospital=request.user.hospital, paid_on__range=[dfrom, dto]).select_related("doctor")
+
+    sums = {
+        pt: Sum(Case(
+            When(pay_type=pt, then=F("amount")),
+            default=Value(0),
+            output_field=DecimalField(max_digits=12, decimal_places=2),
+        ))
+        for pt, _ in PaymentTransaction.PAYMENT_CHOICES
+    }
+
+    rows = qs.values("doctor_id", "doctor__doctor_name").annotate(total=Sum("amount"), **{pt: sums[pt] for pt, _ in PaymentTransaction.PAYMENT_CHOICES}).order_by("-total")
+    grand = qs.aggregate(total=Sum("amount"), **{pt: sums[pt] for pt, _ in PaymentTransaction.PAYMENT_CHOICES})
+
+    def n(v): return float(v or Decimal("0.00"))
+    data = []
+    for r in rows:
+        item = {"doctor_id": r["doctor_id"], "doctor": r.get("doctor__doctor_name") or "—", "total": n(r["total"])}
+        for pt, _ in PaymentTransaction.PAYMENT_CHOICES:
+            item[pt] = n(r.get(pt))
+        data.append(item)
+
+    return JsonResponse({"range": {"from": str(dfrom), "to": str(dto)}, "rows": data, "grand": {k: n(v) for k, v in grand.items()}})
+
+
+
+
+
+# ——— AJAX helpers (optional) ———
+
+
+@login_required
+def services_api(request):
+    qs = Service.objects.filter(hospital=request.user.hospital).order_by("service_name")
+    return JsonResponse({"results": [{"id": s.id, "name": s.service_name, "fees": s.service_fees} for s in qs]})
+
+
+@login_required
+def export_revenue_csv(request):
+    start, end = _parse_range(request)
+
+    qs = (PaymentTransaction.objects
+          .filter(hospital=request.user.hospital, paid_on__range=[start, end])
+          .values("paid_on")
+          .annotate(total=Sum("amount"))
+          .order_by("paid_on"))
+
+    resp = HttpResponse(content_type="text/csv")
+    resp["Content-Disposition"] = 'attachment; filename="revenue_timeseries.csv"'
+    w = csv.writer(resp)
+    w.writerow(["Date", "Total"])
+    for row in qs:
+        w.writerow([row["paid_on"].isoformat(), float(row["total"] or 0)])
+    return resp
+
+
+
+MOBILE_LENGTH = 10          # adjust if needed
+MIN_NAME_CHARS = 3
+MIN_MOBILE_PREFIX = 3
+
+
+@login_required
+def patient_search(request):
+    q = (request.GET.get("q") or "").strip()
+    qs = Patient.objects.filter(hospital=request.user.hospital).select_related("contact")
+
+    if not q:
+        return JsonResponse({"results": []})
+
+    # Split into name tokens and digit run
+    tokens = [t for t in q.split() if t]
+    digits = "".join(ch for ch in q if ch.isdigit())
+
+    name_q = Q()
+    for t in tokens:
+        if len(t) >= MIN_NAME_CHARS:
+            name_q &= Q(patient_name__icontains=t)
+
+    mobile_q = Q()
+    if len(digits) == MOBILE_LENGTH:
+        # exact 10-digit match
+        mobile_q = Q(contact__mobile_num=int(digits))
+    elif len(digits) >= MIN_MOBILE_PREFIX:
+        # prefix search via numeric range
+        low, high = _mobile_prefix_range(digits)
+        mobile_q = Q(contact__mobile_num__range=(low, high))
+
+    # Combine rules
+    if name_q and mobile_q:
+        qs = qs.filter(name_q | mobile_q)
+    elif name_q:
+        qs = qs.filter(name_q)
+    elif mobile_q:
+        qs = qs.filter(mobile_q)
+    else:
+        return JsonResponse({"results": []})
+
+    qs = qs.order_by("patient_name", "id")[:20]
+
+    # ✅ Extended fields for JS auto-fill
+    data = [{
+        "id": p.id,
+        "name": p.patient_name,
+        "mobile": str(getattr(p.contact, "mobile_num", "")),
+        "age_years": p.age_years or "",
+        "age_months": p.age_months or "",
+        "gender": p.gender or "O",
+        "referred_by": p.referred_by or "",
+    } for p in qs]
+
+    return JsonResponse({"results": data})
+
+
+
+@login_required
+def patient_lookup(request):
+    mobile = (request.GET.get("mobile") or "").strip()
+    hospital = request.user.hospital
+
+    if not mobile:
+        return JsonResponse({"found": False})
+
+    qs = get_patient_queryset(hospital, mobile)
+    if not qs.exists():
+        return JsonResponse({"found": False})
+
+    p = qs.first()
+    return JsonResponse({
+        "found": True,
+        "id": p.id,
+        "name": p.patient_name,
+        "mobile": str(p.contact.mobile_num),
+        "age_years": p.age_years,
+        "age_months": p.age_months,
+        "gender": p.gender,
+        "referred_by": p.referred_by or "",
+    })
+

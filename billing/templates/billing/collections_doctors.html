@@ -1,0 +1,101 @@
+{% extends "base_sidebar.html" %}
+{% load static %}
+{% block title %}Doctor-wise Collections{% endblock %}
+{% block content %}
+<div class="container py-3">
+  <div class="d-flex flex-wrap gap-2 align-items-end mb-3">
+    <div>
+      <label class="form-label">From</label>
+      <input type="date" id="from" class="form-control" value="{{ dfrom }}">
+    </div>
+    <div>
+      <label class="form-label">To</label>
+      <input type="date" id="to" class="form-control" value="{{ dto }}">
+    </div>
+    <div>
+      <label class="form-label">Pay Type</label>
+      <select id="pay_type" class="form-select">
+        <option value="">All</option>
+        {% for pt in pay_types %}<option value="{{ pt }}">{{ pt }}</option>{% endfor %}
+      </select>
+    </div>
+    <button class="btn btn-primary" id="refresh">Refresh</button>
+  </div>
+
+  <div class="card mb-3">
+    <div class="card-body">
+      <canvas id="docChart" height="120"></canvas>
+    </div>
+  </div>
+
+  <div class="table-responsive">
+    <table class="table table-sm table-striped">
+      <thead>
+        <tr>
+          <th>Doctor</th>
+          <th class="text-end">Total</th>
+          {% for pt in pay_types %}<th class="text-end">{{ pt }}</th>{% endfor %}
+        </tr>
+      </thead>
+      <tbody id="rows"></tbody>
+      <tfoot>
+        <tr class="fw-bold">
+          <td>Grand Total</td>
+          <td class="text-end" id="gt_total">0</td>
+          {% for pt in pay_types %}<td class="text-end" id="gt_{{ pt|lower }}">0</td>{% endfor %}
+        </tr>
+      </tfoot>
+    </table>
+  </div>
+</div>
+
+<script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+<script>
+function q() {
+  const f = document.getElementById('from').value;
+  const t = document.getElementById('to').value;
+  const pt = document.getElementById('pay_type').value;
+  const p = new URLSearchParams({from:f, to:t});
+  if (pt) p.set('pay_type', pt);
+  return p.toString();
+}
+
+async function load() {
+  const r = await fetch("{% url 'billing:collections_doctors_data' %}?"+q());
+  const j = await r.json();
+  const rows = document.getElementById('rows');
+  rows.innerHTML = "";
+  const labels = [], data = [];
+
+  j.rows.forEach(row => {
+    labels.push(row.doctor);
+    data.push(row.total);
+    const tr = document.createElement('tr');
+    tr.innerHTML = `
+      <td>${row.doctor}</td>
+      <td class="text-end">${Math.round(row.total).toLocaleString('en-IN')}</td>
+      ${j.pay_types.map(pt => `<td class="text-end">${Math.round(row[pt.toLowerCase()]||0).toLocaleString('en-IN')}</td>`).join('')}
+    `;
+    rows.appendChild(tr);
+  });
+
+  document.getElementById('gt_total').textContent = Math.round(j.grand.total||0).toLocaleString('en-IN');
+  j.pay_types.forEach(pt => {
+    const v = j.grand[pt.toLowerCase()] || 0;
+    const el = document.getElementById('gt_'+pt.toLowerCase());
+    if (el) el.textContent = Math.round(v).toLocaleString('en-IN');
+  });
+
+  window._docChart?.destroy();
+  window._docChart = new Chart(document.getElementById('docChart'), {
+    type: 'bar',
+    data: { labels, datasets: [{ label: 'Total', data }] },
+    options: { indexAxis: 'y', plugins: { legend: { display: false } } }
+  });
+}
+
+document.getElementById('refresh').addEventListener('click', load);
+['from','to','pay_type'].forEach(id => document.getElementById(id).addEventListener('change', load));
+load();
+</script>
+{% endblock %}

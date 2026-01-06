@@ -1,0 +1,274 @@
+{% extends 'base_sidebar.html' %}
+{% load static %}
+{% load core_filters %}
+
+{% block title %}Finance Dashboard{% endblock %}
+
+{% block content %}
+<link href="https://fonts.googleapis.com/icon?family=Material+Icons" rel="stylesheet">
+
+<style>
+  .scrollable { max-height: calc(100vh - 70px); overflow-y: auto; padding-bottom: 50px; }
+  .metric-card { min-height: 120px; background:#fff; border-radius: 12px; padding: 16px; box-shadow: 0 2px 6px rgba(0,0,0,0.08); text-align:center; }
+  .metric-card h6 { margin: 4px 0 0; font-weight: 700; }
+  .material-icons.md-36 { font-size: 36px; }
+  .section-title { font-weight: 700; color: #0d6efd; }
+  .filters .form-select, .filters .form-control { min-width: 180px; }
+  .kpi-sub { font-size: 12px; color:#6c757d; margin-top:2px; }
+</style>
+
+<div class="container-fluid py-4 scrollable">
+
+  <!-- Header / Quick actions -->
+  <div class="d-flex gap-2">
+  {% url 'patients:register' as patients_register_url %}
+  {% if patients_register_url %}
+    <a class="btn btn-outline-primary btn-sm" href="{{ patients_register_url }}">
+      <span class="material-icons">app_registration</span>
+    </a>
+  {% endif %}
+
+  <!-- Billing points to the current dashboard -->
+  <a class="btn btn-outline-primary btn-sm" href="{% url 'billing:dashboard' %}">
+    <span class="material-icons">payments</span>
+  </a>
+
+  {% url 'queue_mgt:queue' as queue_url %}
+  {% if queue_url %}
+    <a class="btn btn-outline-primary btn-sm" href="{{ queue_url }}">
+      <span class="material-icons">queue</span>
+    </a>
+  {% endif %}
+
+  {% url 'reports:dashboard' as reports_dash_url %}
+  {% if reports_dash_url %}
+    <a class="btn btn-outline-primary btn-sm" href="{{ reports_dash_url }}">
+      <span class="material-icons">insights</span>
+    </a>
+  {% endif %}
+
+  {% url 'core:users' as users_url %}
+  {% if users_url %}
+    <a class="btn btn-outline-primary btn-sm" href="{{ users_url }}">
+      <span class="material-icons">group</span>
+    </a>
+  {% endif %}
+
+  <!-- {% url 'prescription:list' as rx_list_url %} -->
+   {% url 'prescription:view_prescriptions' as rx_list_url %}
+
+  {% if rx_list_url %}
+    <a class="btn btn-outline-primary btn-sm" href="{{ rx_list_url }}">
+      <span class="material-icons">medical_services</span>
+    </a>
+  {% endif %}
+</div>
+
+  <!-- Filters -->
+  <form class="filters card card-body mb-3" method="get">
+    <div class="row g-2 align-items-end">
+      <div class="col-auto">
+        <label class="form-label">From</label>
+        <input type="date" class="form-control" name="start" value="{{ q.start }}">
+      </div>
+      <div class="col-auto">
+        <label class="form-label">To</label>
+        <input type="date" class="form-control" name="end" value="{{ q.end }}">
+      </div>
+      <div class="col-auto">
+        <label class="form-label">Doctor</label>
+        <select class="form-select" name="doctor_id">
+          <option value="">All Doctors</option>
+          {% for d in doctors %}
+            <option value="{{ d.id }}" {% if q.doctor_id|default:''|stringformat:'s' == d.id|stringformat:'s' %}selected{% endif %}>
+              {{ d.doctor_name }}
+            </option>
+          {% endfor %}
+        </select>
+      </div>
+      <div class="col-auto">
+        <label class="form-label">Service</label>
+        <select class="form-select" name="service_id">
+          <option value="">All Services</option>
+          {% for s in services %}
+            <option value="{{ s.id }}" {% if q.service_id|default:''|stringformat:'s' == s.id|stringformat:'s' %}selected{% endif %}>{{ s.service_name }}</option>
+          {% endfor %}
+        </select>
+      </div>
+      <div class="col-auto">
+        <label class="form-label">Pay Type</label>
+        <select class="form-select" name="pay_type">
+          <option value="">All</option>
+          {% for code,label in pay_types %}
+            <option value="{{ code }}" {% if q.pay_type == code %}selected{% endif %}>{{ label }}</option>
+          {% endfor %}
+        </select>
+      </div>
+      <div class="col-auto">
+        <button class="btn btn-primary"><span class="material-icons">search</span></button>
+        <a class="btn btn-outline-secondary" href="."><span class="material-icons">refresh</span></a>
+      </div>
+    </div>
+  </form>
+
+  <!-- KPIs -->
+  <h6 class="section-title">Clinic at a Glance</h6>
+  <div class="row g-3 mt-1">
+    <div class="col-6 col-md-3 col-lg-2">
+      <div class="metric-card">
+        <span class="material-icons text-primary md-36">person_add</span>
+        <div>Total OP</div>
+        <div class="kpi-sub">{{ q.start }} → {{ q.end }}</div>
+        <h6>{{ kpi.total_op|default:0 }}</h6>
+      </div>
+    </div>
+    <div class="col-6 col-md-3 col-lg-2">
+      <div class="metric-card">
+        <span class="material-icons text-primary md-36">payments</span>
+        <div>Revenue (₹)</div>
+        <div class="kpi-sub">Collected</div>
+        <h6>{{ kpi.total_amount|default:'0' }}</h6>
+      </div>
+    </div>
+    <div class="col-6 col-md-3 col-lg-2">
+      <div class="metric-card">
+        <span class="material-icons text-primary md-36">point_of_sale</span>
+        <div>Procedures</div>
+        <div class="kpi-sub">Count</div>
+        <h6>{{ kpi.procedures|default:0 }}</h6>
+      </div>
+    </div>
+    <div class="col-6 col-md-3 col-lg-2">
+      <div class="metric-card">
+        <span class="material-icons text-primary md-36">groups</span>
+        <div>Consultations</div>
+        <div class="kpi-sub">Count</div>
+        <h6>{{ kpi.consultations|default:0 }}</h6>
+      </div>
+    </div>
+    <div class="col-6 col-md-3 col-lg-2">
+      <div class="metric-card">
+        <span class="material-icons text-primary md-36">science</span>
+        <div>Lab</div>
+        <div class="kpi-sub">Count</div>
+        <h6>{{ kpi.lab|default:0 }}</h6>
+      </div>
+    </div>
+  </div>
+
+  <hr>
+
+  <!-- Queue Overview (uses AppointmentDetails.completed constants) -->
+  <h6 class="section-title">Queue Overview</h6>
+  <div class="row g-3 mt-1">
+    <div class="col-6 col-md-3 col-lg-2"><div class="metric-card"><span class="material-icons text-primary md-36">groups</span><div>Total</div><h6>{{ queue.total|default:0 }}</h6></div></div>
+    <div class="col-6 col-md-3 col-lg-2"><div class="metric-card"><span class="material-icons text-primary md-36">app_registration</span><div>Registered</div><h6>{{ queue.registered|default:0 }}</h6></div></div>
+    <div class="col-6 col-md-3 col-lg-2"><div class="metric-card"><span class="material-icons text-primary md-36">queue</span><div>In Queue</div><h6>{{ queue.in_queue|default:0 }}</h6></div></div>
+    <div class="col-6 col-md-3 col-lg-2"><div class="metric-card"><span class="material-icons text-primary md-36">check_circle</span><div>Done</div><h6>{{ queue.done|default:0 }}</h6></div></div>
+    <div class="col-6 col-md-3 col-lg-2"><div class="metric-card"><span class="material-icons text-primary md-36">block</span><div>No Show</div><h6>{{ queue.no_show|default:0 }}</h6></div></div>
+  </div>
+
+  <hr>
+
+  <!-- Finances Overview -->
+  <h6 class="section-title">Finances Overview</h6>
+  <div class="row g-3 mt-1">
+    <div class="col-6 col-md-3 col-lg-2">
+      <div class="metric-card">
+        <span class="material-icons text-primary md-36">currency_rupee</span>
+        <div>Total Amount</div>
+        <h6>{{ finance.total|default:'0' }}</h6>
+      </div>
+    </div>
+
+    <div class="col-6 col-md-3 col-lg-2">
+      <div class="metric-card">
+        <span class="material-icons text-primary md-36">attach_money</span>
+        <div>Cash</div>
+        <h6>{{ finance.by_type.Cash|default:'0' }}</h6>
+      </div>
+    </div>
+
+    <div class="col-6 col-md-3 col-lg-2">
+      <div class="metric-card">
+        <span class="material-icons text-primary md-36">account_balance_wallet</span>
+        <div>UPI</div>
+        <h6>{{ finance.by_type.UPI|default:'0' }}</h6>
+      </div>
+    </div>
+
+    <div class="col-6 col-md-3 col-lg-2">
+      <div class="metric-card">
+        <span class="material-icons text-primary md-36">credit_card</span>
+        <div>Card</div>
+        <h6>{{ finance.by_type.Card|default:'0' }}</h6>
+      </div>
+    </div>
+
+    <div class="col-6 col-md-3 col-lg-2">
+      <div class="metric-card">
+        <span class="material-icons text-primary md-36">healing</span>
+        <div>Review</div>
+        <h6>{{ finance.by_type.Review|default:'0' }}</h6>
+      </div>
+    </div>
+
+    <div class="col-6 col-md-3 col-lg-2">
+      <div class="metric-card">
+        <span class="material-icons text-primary md-36">pending</span>
+        <div>Due</div>
+        <h6>{{ finance.by_type.Due|default:'0' }}</h6>
+      </div>
+    </div>
+
+    <div class="col-6 col-md-3 col-lg-2">
+      <div class="metric-card">
+        <span class="material-icons text-primary md-36">more_horiz</span>
+        <div>Other</div>
+        <h6>{{ finance.by_type.Other|default:'0' }}</h6>
+      </div>
+    </div>
+  </div>
+
+  <!-- Top doctors/services -->
+  <hr>
+  <div class="row g-3">
+    <div class="col-lg-6">
+      <div class="card">
+        <div class="card-header fw-bold">Top Doctors by Revenue</div>
+        <div class="card-body p-0">
+          <table class="table table-sm mb-0">
+            <thead><tr><th>Doctor</th><th class="text-end">Amount (₹)</th></tr></thead>
+            <tbody>
+              {% for row in top_doctors %}
+                <tr><td>{{ row.name }}</td><td class="text-end">{{ row.amount }}</td></tr>
+              {% empty %}
+                <tr><td colspan="2" class="text-center text-muted">No data</td></tr>
+              {% endfor %}
+            </tbody>
+          </table>
+        </div>
+      </div>
+    </div>
+
+    <div class="col-lg-6">
+      <div class="card">
+        <div class="card-header fw-bold">Top Services by Revenue</div>
+        <div class="card-body p-0">
+          <table class="table table-sm mb-0">
+            <thead><tr><th>Service</th><th class="text-end">Amount (₹)</th></tr></thead>
+            <tbody>
+              {% for row in top_services %}
+                <tr><td>{{ row.name }}</td><td class="text-end">{{ row.amount }}</td></tr>
+              {% empty %}
+                <tr><td colspan="2" class="text-center text-muted">No data</td></tr>
+              {% endfor %}
+            </tbody>
+          </table>
+        </div>
+      </div>
+    </div>
+  </div>
+
+</div>
+{% endblock %}
