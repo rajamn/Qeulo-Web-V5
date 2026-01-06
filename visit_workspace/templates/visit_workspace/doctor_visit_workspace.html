@@ -1,0 +1,75 @@
+{% extends "base_sidebar.html" %}
+
+{% block title %}Visit Workspace{% endblock %}
+
+{% block content %}
+<div class="container mt-4">
+
+    <h3 class="mb-3 text-primary">
+        Visit Workspace – {{ patient.patient_name }}
+    </h3>
+
+    <!-- Summary Panel -->
+    <div class="card mb-3 shadow-sm">
+        <div class="card-header bg-info text-white">
+            <strong>🧠 AI Summary (Placeholder)</strong>
+        </div>
+        <div class="card-body">
+            <p>AI summary will appear here via AJAX.</p>
+        </div>
+    </div>
+
+    <!-- Clinical Notes -->
+    <div class="card mb-3 shadow-sm">
+        <div class="card-header bg-secondary text-white">
+            <strong>Clinical Notes</strong>
+        </div>
+        <div class="card-body">
+            <textarea class="form-control" rows="4"
+            placeholder="Use mic to dictate clinical notes..."></textarea>
+            <button class="btn btn-sm btn-dark mt-2">🎤 Start Dictation</button>
+        </div>
+    </div>
+
+    <!-- Prescription -->
+    <div class="card mb-3 shadow-sm">
+        <div class="card-header bg-success text-white">
+            <strong>Prescription</strong>
+        </div>
+        <div class="card-body">
+            {% if prescription_details %}
+                <h6>Existing Prescription:</h6>
+                <ul>
+                    {% for d in prescription_details %}
+                        <li>{{ d.drug_name }} – {{ d.dosage }} – {{ d.frequency }} × {{ d.duration }}</li>
+                    {% endfor %}
+                </ul>
+            {% else %}
+                <p>No existing prescription yet.</p>
+            {% endif %}
+        </div>
+    </div>
+
+    <!-- Documents -->
+    <div class="card mb-3 shadow-sm">
+        <div class="card-header bg-dark text-white">
+            <strong>Documents</strong>
+        </div>
+        <div class="card-body">
+            {% if visit_docs %}
+                <ul>
+                    {% for doc in visit_docs %}
+                        <li>{{ doc.get_doc_type_display }} – {{ doc.created_at.date }}
+                           ({{ doc.description }})
+                           <a href="{{ doc.file.url }}" target="_blank">View</a>
+                        </li>
+                    {% endfor %}
+                </ul>
+            {% else %}
+                <p>No documents uploaded.</p>
+            {% endif %}
+        </div>
+    </div>
+
+</div>
+{% endblock %}

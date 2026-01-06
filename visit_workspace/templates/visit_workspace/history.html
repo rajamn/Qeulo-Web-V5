@@ -1,0 +1,184 @@
+{% extends "base_sidebar.html" %}
+{% load static %}
+{% block title %}Visit History{% endblock %}
+
+{% block content %}
+<div class="container mt-4">
+
+    <!-- HEADER -->
+    <div class="d-flex justify-content-between align-items-center mb-4">
+        <h2 class="text-primary mb-0">
+            Visit History – {{ patient.patient_name }}
+        </h2>
+
+        <a href="{% url 'patients:dashboard' %}" class="btn btn-outline-secondary">
+            <i class="bi bi-arrow-left"></i> Back to Dashboard
+        </a>
+    </div>
+
+    <div class="row">
+        <!-- Sidebar -->
+        <div class="col-md-3 d-none d-md-block">
+            <div class="list-group shadow-sm">
+                <a href="{% url 'patients:dashboard' %}" class="list-group-item list-group-item-action">
+                    <i class="bi bi-house"></i> Patient Dashboard
+                </a>
+                <a href="#" class="list-group-item list-group-item-action active">
+                    <i class="bi bi-clock-history"></i> Visit History
+                </a>
+            </div>
+        </div>
+
+        <!-- TIMELINE -->
+        <div class="col-md-9">
+
+            {% if documents %}
+                {% for doc in documents %}
+                <div class="timeline-item mb-4">
+                    <div class="card shadow-sm border-0">
+
+                        <!-- Card Header -->
+                        <div class="card-header d-flex justify-content-between align-items-center">
+                            <div>
+                                <strong>{{ doc.get_doc_type_display }}</strong>
+                                <small class="text-muted ms-2">
+                                    {{ doc.created_at|date:"d M Y, h:i A" }}
+                                </small>
+                            </div>
+                            <span class="badge bg-secondary">{{ doc.doc_type }}</span>
+                        </div>
+
+                        <div class="card-body">
+
+                            <!-- Title -->
+                            <h5 class="card-title mb-3">
+                                <i class="bi bi-file-earmark-text"></i>
+                                {{ doc.description|default:"Uploaded Document" }}
+                            </h5>
+
+                            <!-- File Viewer -->
+                            {% if doc.file %}
+                            <a href="{{ doc.file.url }}" target="_blank"
+                               class="btn btn-sm btn-outline-primary mb-3">
+                                <i class="bi bi-eye"></i> View Document
+                            </a>
+                            {% endif %}
+
+                            <!-- AI SUMMARY -->
+                            <div class="mt-3">
+                                {% if doc.has_valid_ai %}
+                                <!-- AI SUMMARY AVAILABLE -->
+                                <details>
+                                    <summary class="fw-bold text-success">
+                                        <i class="bi bi-robot"></i> AI Summary
+                                    </summary>
+
+                                    <div class="p-3 bg-light rounded border mt-2">
+
+                                        {% if doc.ai_summary_data.impression %}
+                                        <p><strong>Impression:</strong><br>
+                                            {{ doc.ai_summary_data.impression }}
+                                        </p>
+                                        {% endif %}
+
+                                        {% if doc.ai_summary_data.key_findings %}
+                                        <strong>Key Findings:</strong>
+                                        <ul>
+                                            {% for line in doc.ai_summary_data.key_findings.splitlines %}
+                                                {% if line %}
+                                                <li>{{ line }}</li>
+                                                {% endif %}
+                                            {% endfor %}
+                                        </ul>
+                                        {% endif %}
+
+                                        {% if doc.ai_summary_data.recommendations %}
+                                        <strong>Recommendations:</strong>
+                                        <ul>
+                                            {% for line in doc.ai_summary_data.recommendations.splitlines %}
+                                                {% if line %}
+                                                <li>{{ line }}</li>
+                                                {% endif %}
+                                            {% endfor %}
+                                        </ul>
+                                        {% endif %}
+
+                                    </div>
+                                </details>
+
+                                {% else %}
+                                <!-- NO AI SUMMARY — SHOW RETRY BUTTON -->
+                                <div class="alert alert-warning p-2 mt-2">
+                                    <strong>No AI summary available.</strong>
+                                    <div class="mt-2">
+                                        <a href="{% url 'visit_workspace:summary' doc.id %}?retry=1"
+                                        class="btn btn-warning btn-sm">
+                                            <i class="bi bi-arrow-repeat"></i> Retry AI Summary
+                                        </a>
+                                    </div>
+                                </div>
+                                {% endif %}
+                            </div>
+
+                            <!-- OCR TEXT -->
+                            {% if doc.ocr_text %}
+                            <details class="mt-3">
+                                <summary class="fw-bold text-primary">
+                                    <i class="bi bi-search"></i> OCR Extracted Text
+                                </summary>
+
+                                <pre class="p-3 bg-light rounded border mt-2"
+                                     style="white-space: pre-wrap; max-height: 300px; overflow-y:auto;">
+{{ doc.ocr_text }}
+                                </pre>
+                            </details>
+                            {% endif %}
+
+                            <!-- NOTES linked to this document -->
+                            {% with notes_for_doc=notes|dictsort:"created_at" %}
+                            {% for note in notes %}
+                                {% if note.document_id == doc.id %}
+                                    {% if forloop.first %}
+                                    <hr>
+                                    <h6 class="fw-bold mb-3">
+                                        <i class="bi bi-journal-text"></i> Notes Linked to This Document
+                                    </h6>
+                                    {% endif %}
+                                    <div class="mb-3">
+                                        <span class="badge 
+                                            {% if note.note_type == 'AI_SUMMARY' %} bg-success 
+                                            {% else %} bg-info {% endif %}">
+                                            {{ note.get_note_type_display }}
+                                        </span>
+
+                                        <div class="p-3 bg-light rounded border mt-2"
+                                             style="white-space: pre-line;">
+                                            {{ note.text|linebreaksbr }}
+                                        </div>
+
+                                        <div class="text-end small text-muted">
+                                            {{ note.created_at|date:"d M Y, h:i A" }}
+                                        </div>
+                                    </div>
+                                {% endif %}
+                            {% endfor %}
+                            {% endwith %}
+
+                        </div><!-- end card-body -->
+
+                    </div><!-- end card -->
+                </div><!-- end timeline-item -->
+                {% endfor %}
+
+            {% else %}
+                <div class="alert alert-info">
+                    No documents found for this patient.
+                </div>
+            {% endif %}
+
+        </div><!-- end col-md-9 -->
+
+    </div><!-- end row -->
+
+</div><!-- end container -->
+{% endblock %}

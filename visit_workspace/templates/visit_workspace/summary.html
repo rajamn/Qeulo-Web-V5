@@ -1,0 +1,225 @@
+{% extends "base_sidebar.html" %}
+{% load static %}
+
+{% block title %}Document Summary{% endblock %}
+
+{% block content %}
+
+<div class="d-flex justify-content-between align-items-center mb-3">
+    <h3 class="text-primary mb-0">
+        <i class="bi bi-file-medical"></i> Document Summary
+    </h3>
+
+    <div class="d-flex gap-2">
+
+        {% if not is_ai %}
+        <a href="?retry=1" class="btn btn-warning btn-sm">
+            <i class="bi bi-arrow-repeat"></i> Retry AI
+        </a>
+        {% endif %}
+
+        <a href="{% url 'visit_workspace:patient_history' patient.id %}"
+           class="btn btn-outline-secondary btn-sm">
+            <i class="bi bi-arrow-left"></i> Back
+        </a>
+    </div>
+</div>
+
+
+    <!-- Patient Info -->
+    <div class="mb-3">
+        <h5>
+            <i class="bi bi-person"></i>
+            {{ patient.patient_name }} — {{ patient.contact.mobile_num }}
+        </h5>
+    </div>
+
+    <!-- Doc Info -->
+    <div class="card shadow-sm border-0 mb-4">
+        <div class="card-body">
+            <h5 class="card-title mb-2">
+                <i class="bi bi-file-earmark-text"></i>
+                {{ doc.get_doc_type_display }}
+            </h5>
+            <p class="text-muted mb-1">
+                <strong>Description:</strong> {{ doc.description|default:"—" }}
+            </p>
+            <p class="text-muted">
+                <strong>Uploaded:</strong> {{ doc.created_at|date:"d M Y, h:i A" }}
+            </p>
+
+            {% if is_ai %}
+                <span class="badge bg-success">AI Generated</span>
+            {% else %}
+                <span class="badge bg-secondary">OCR Summary</span>
+            {% endif %}
+        </div>
+    </div>
+
+    <!-- Error or Info Message -->
+    {% if error_message %}
+    <div class="alert alert-warning">
+        <strong>Note:</strong> {{ error_message }}
+    </div>
+    {% endif %}
+
+    <!-- ========================= -->
+    <!--   RECONSTRUCTED DOCUMENT   -->
+    <!-- ========================= -->
+    {% if json_data.reconstructed %}
+    <div class="card shadow-sm border-0 mb-4">
+        <div class="card-header bg-dark text-white">
+            <i class="bi bi-table"></i> Reconstructed Document (AI)
+        </div>
+        <div class="card-body">
+            <pre style="white-space: pre-wrap; background:#fafafa; padding:12px; font-family: 'Courier New', monospace;">
+{{ json_data.reconstructed }}
+            </pre>
+        </div>
+    </div>
+    {% endif %}
+
+    <!-- ========================= -->
+    <!--     KEY FINDINGS          -->
+    <!-- ========================= -->
+    {% if json_data.key_findings %}
+    <div class="card shadow-sm border-0 mb-4">
+        <div class="card-header bg-primary text-white">
+            <i class="bi bi-clipboard-check"></i> Key Findings
+        </div>
+        <div class="card-body" style="white-space: pre-wrap;">
+            {{ json_data.key_findings }}
+        </div>
+    </div>
+    {% endif %}
+
+    <!-- ========================= -->
+    <!--        IMPRESSION         -->
+    <!-- ========================= -->
+    {% if json_data.impression %}
+    <div class="card shadow-sm border-0 mb-4">
+        <div class="card-header bg-info text-white">
+            <i class="bi bi-flag"></i> Impression
+        </div>
+        <div class="card-body" style="white-space: pre-wrap;">
+            {{ json_data.impression }}
+        </div>
+    </div>
+    {% endif %}
+
+    <!-- ========================= -->
+    <!--     RECOMMENDATIONS       -->
+    <!-- ========================= -->
+    {% if json_data.recommendations %}
+    <div class="card shadow-sm border-0 mb-4">
+        <div class="card-header bg-success text-white">
+            <i class="bi bi-check2-circle"></i> Recommendations
+        </div>
+        <div class="card-body" style="white-space: pre-wrap;">
+            {{ json_data.recommendations }}
+        </div>
+    </div>
+    {% endif %}
+
+    <!-- ========================= -->
+    <!--     BULLET SUMMARY        -->
+    <!-- ========================= -->
+    {% if bullet_summary %}
+    <div class="card shadow-sm border-0 mb-4">
+        <div class="card-header bg-secondary text-white">
+            <i class="bi bi-list-task"></i> Summary (AI)
+        </div>
+        <div class="card-body" style="white-space: pre-wrap;">
+            {{ bullet_summary }}
+        </div>
+    </div>
+    {% endif %}
+
+    <!-- ========================= -->
+    <!--           NOTES           -->
+    <!-- ========================= -->
+    {% if notes %}
+    <div class="card shadow-sm border-0 mb-4">
+        <div class="card-header bg-warning">
+            <i class="bi bi-journal-richtext"></i> Notes / Interpretation
+        </div>
+        <div class="card-body" style="white-space: pre-wrap;">
+            {{ notes }}
+        </div>
+    </div>
+    {% endif %}
+
+    <!-- ========================= -->
+    <!--    ABNORMAL VALUES        -->
+    <!-- ========================= -->
+    {% if json_data.abnormal_values %}
+    <div class="card shadow-sm border-0 mb-4">
+        <div class="card-header bg-danger text-white">
+            <i class="bi bi-exclamation-triangle"></i> Abnormal Values
+        </div>
+        <div class="card-body">
+            <ul>
+                {% for row in json_data.abnormal_values %}
+                <li>{{ row.test }} — {{ row.value }} (range: {{ row.range|default:"—" }})</li>
+                {% endfor %}
+            </ul>
+        </div>
+    </div>
+    {% endif %}
+
+    <!-- ========================= -->
+    <!--   STRUCTURED LAB VALUES   -->
+    <!-- ========================= -->
+    {% if json_data.structured_values %}
+    <div class="card shadow-sm border-0 mb-4">
+        <div class="card-header bg-light">
+            <i class="bi bi-table"></i> Extracted Lab Values
+        </div>
+
+        <div class="card-body table-responsive">
+            <table class="table table-bordered table-sm">
+                <thead class="table-light">
+                    <tr>
+                        <th>Test</th>
+                        <th>Value</th>
+                        <th>Ref Range</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for row in json_data.structured_values %}
+                    <tr>
+                        <td>{{ row.test }}</td>
+                        <td>{{ row.value }}</td>
+                        <td>{{ row.range|default:"—" }}</td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+    </div>
+    {% endif %}
+
+    <!-- ========================= -->
+    <!--       RAW OCR TEXT        -->
+    <!-- ========================= -->
+    <div class="card shadow-sm border-0 mb-5">
+        <div class="card-header bg-secondary text-white">
+            <i class="bi bi-code-slash"></i> Raw OCR Text
+            <button class="btn btn-light btn-sm float-end"
+                    data-bs-toggle="collapse"
+                    data-bs-target="#ocrText">
+                Show / Hide
+            </button>
+        </div>
+
+        <div id="ocrText" class="collapse">
+            <div class="card-body">
+                <pre style="white-space: pre-wrap; font-size: 0.9rem;">
+{{ doc.ocr_text }}
+                </pre>
+            </div>
+        </div>
+    </div>
+
+</div>
+{% endblock %}

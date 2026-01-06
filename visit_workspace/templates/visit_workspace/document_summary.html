@@ -1,0 +1,158 @@
+{% extends "base_sidebar.html" %}
+{% load static %}
+
+{% block title %}Document Summary{% endblock %}
+
+{% block content %}
+<div class="container mt-4">
+
+  <h3 class="text-primary mb-3">
+    <i class="bi bi-file-medical"></i> Document Summary
+  </h3>
+
+  <!-- Patient -->
+  <div class="mb-3">
+    <h5>
+      <i class="bi bi-person"></i>
+      {{ patient.patient_name }} — {{ patient.contact.mobile_num }}
+    </h5>
+  </div>
+
+  <!-- Document Card -->
+  <div class="card shadow-sm border-0 mb-4">
+    <div class="card-body">
+
+      <h5 class="card-title mb-3">
+        <i class="bi bi-file-earmark-text"></i>
+        {{ doc.get_doc_type_display|default:doc.doc_type }}
+      </h5>
+
+      <p class="text-muted mb-2"><strong>Description:</strong> {{ doc.description|default:"—" }}</p>
+      <p class="text-muted"><strong>Uploaded On:</strong> {{ doc.created_at }}</p>
+
+    </div>
+  </div>
+
+  <!-- ERROR MESSAGE (fallback mode) -->
+  {% if error_message %}
+  <div class="alert alert-warning">
+    <strong>Note:</strong> {{ error_message }}
+  </div>
+  {% endif %}
+
+  <!-- Summary Section -->
+  <div class="card shadow-sm border-0 mb-4">
+
+    <div class="card-header {% if is_ai %}bg-primary{% else %}bg-secondary{% endif %} text-white">
+      {% if is_ai %}
+      <i class="bi bi-stars"></i> AI-Generated Summary
+      {% else %}
+      <i class="bi bi-file-text"></i> Raw OCR Summary (Fallback)
+      {% endif %}
+    </div>
+
+    <div class="card-body">
+
+      {% if summary.key_findings %}
+      <h6 class="fw-bold"><i class="bi bi-clipboard-check"></i> Key Findings</h6>
+      <p>{{ summary.key_findings }}</p>
+      <hr>
+      {% endif %}
+
+      {% if summary.impression %}
+      <h6 class="fw-bold"><i class="bi bi-flag"></i> Impression</h6>
+      <p>{{ summary.impression }}</p>
+      <hr>
+      {% endif %}
+
+      {% if summary.recommendations %}
+      <h6 class="fw-bold"><i class="bi bi-check2-circle"></i> Recommendations</h6>
+      <p>{{ summary.recommendations }}</p>
+      <hr>
+      {% endif %}
+
+      {% if summary.free_summary %}
+      <h6 class="fw-bold"><i class="bi bi-journal-text"></i> Summary (Text)</h6>
+      <p>{{ summary.free_summary }}</p>
+      <hr>
+      {% endif %}
+
+      {% if summary.abnormal_values %}
+      <h6 class="fw-bold text-danger"><i class="bi bi-exclamation-triangle"></i> Abnormal Values</h6>
+      <ul>
+        {% for row in summary.abnormal_values %}
+        <li>{{ row.test }} — {{ row.value }} (range: {{ row.range|default:"–" }})</li>
+        {% endfor %}
+      </ul>
+      <hr>
+      {% endif %}
+
+      {% if summary.structured_values %}
+      <h6 class="fw-bold"><i class="bi bi-table"></i> Extracted Lab Values</h6>
+
+      <div class="table-responsive">
+        <table class="table table-bordered table-sm">
+          <thead class="table-light">
+            <tr>
+              <th>Test</th>
+              <th>Value</th>
+              <th>Ref Range</th>
+            </tr>
+          </thead>
+          <tbody>
+            {% for row in summary.structured_values %}
+            <tr>
+              <td>{{ row.test }}</td>
+              <td>{{ row.value|default:"—" }}</td>
+              <td>{{ row.range|default:"—" }}</td>
+            </tr>
+            {% endfor %}
+          </tbody>
+        </table>
+      </div>
+      <hr>
+      {% endif %}
+
+    </div>
+  </div>
+
+  <!-- OCR Raw Text -->
+  <div class="card shadow-sm border-0 mb-4">
+    <div class="card-header bg-secondary text-white">
+      <i class="bi bi-code-slash"></i> Raw OCR Text
+      <button class="btn btn-light btn-sm float-end"
+              type="button"
+              data-bs-toggle="collapse"
+              data-bs-target="#ocrText">
+        Show / Hide
+      </button>
+    </div>
+
+    <div id="ocrText" class="collapse">
+      <div class="card-body">
+        <pre style="white-space: pre-wrap; font-size: 0.9rem;">
+{{ doc.ocr_text }}
+        </pre>
+      </div>
+    </div>
+  </div>
+
+  <!-- ACTIONS -->
+  <div class="d-flex gap-2">
+    <a href="{% url 'visit_workspace:save_summary' doc_id=doc.id %}"
+       class="btn btn-success">
+      <i class="bi bi-save"></i> Save to Visit Notes
+    </a>
+
+    <a href="{% url 'visit_workspace:patient_history' pk=patient.id %}"
+       class="btn btn-outline-primary">
+      <i class="bi bi-arrow-left"></i> Back to History
+    </a>
+
+    <a href="{% url 'patients:dashboard' %}" class="btn btn-outline-secondary">
+      <i class="bi bi-house"></i> Back to Patients
+    </a>
+  </div>
+
+</div>
+{% endblock %}

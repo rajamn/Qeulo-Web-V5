@@ -1,0 +1,277 @@
+{% extends 'base_sidebar.html' %}
+{% load static %}
+
+{% block title %}Upload Documents{% endblock %}
+
+{% block content %}
+<div class="container mt-4">
+
+  <h3 class="text-primary mb-3">
+    <i class="bi bi-cloud-upload"></i> Upload & Process Documents
+  </h3>
+
+  <div class="card shadow-sm border-0">
+    <div class="card-body">
+
+      <h5 class="mb-3">
+        <i class="bi bi-person"></i>
+        {{ patient.patient_name }} ({{ patient.contact.mobile_num }})
+      </h5>
+
+      <!-- Document Type -->
+      <div class="mb-3">
+        <label class="form-label fw-bold">Document Type</label>
+        <select class="form-select" id="docType">
+          <option value="LAB">Lab Report</option>
+          <option value="RAD">Radiology Report</option>
+          <option value="RX_OLD">Old Prescription</option>
+          <option value="DISCH">Discharge Summary</option>
+          <option value="OTHER" selected>Other</option>
+        </select>
+      </div>
+
+      <!-- Description -->
+      <div class="mb-3">
+        <label class="form-label fw-bold">Description (optional)</label>
+        <input type="text" class="form-control" id="description"
+               placeholder="Eg: CBC report / MRI scan / old prescription">
+      </div>
+
+      <!-- Drag & Drop Zone -->
+      <div id="dropzone"
+           class="border border-2 border-primary rounded p-5 text-center bg-light mb-3"
+           style="cursor:pointer;">
+        <i class="bi bi-cloud-arrow-up display-4 text-primary"></i>
+        <p class="mt-3 fw-bold text-primary">
+          Drag & drop PDF / Images here,<br>or click to select files
+        </p>
+        <input type="file" id="fileInput" accept=".pdf,image/*" class="d-none" />
+      </div>
+
+      <!-- Camera Button -->
+      <button id="openCamera" class="btn btn-outline-primary mb-4">
+        <i class="bi bi-camera"></i> Take Picture
+      </button>
+
+      <!-- Preview Area -->
+      <div id="previewArea" class="row g-3 mb-4"></div>
+
+      <!-- Progress -->
+      <div id="progressBox" class="d-none mb-3">
+        <div class="progress">
+          <div id="progressBar" class="progress-bar progress-bar-striped progress-bar-animated bg-success"
+               role="progressbar" style="width: 10%"></div>
+        </div>
+        <p id="progressText" class="mt-2 small text-muted"></p>
+      </div>
+
+      <!-- Start Button -->
+      <button id="startProcessing" class="btn btn-primary" disabled>
+        <i class="bi bi-robot"></i> Extract & Generate Summary
+      </button>
+
+      <a href="javascript:history.back()" class="btn btn-secondary ms-2">Cancel</a>
+
+    </div>
+  </div>
+</div>
+
+<!-- Camera Modal -->
+<div class="modal fade" id="cameraModal" tabindex="-1">
+  <div class="modal-dialog modal-dialog-centered">
+    <div class="modal-content bg-dark text-white">
+      <div class="modal-header">
+        <h5 class="modal-title">Take Picture</h5>
+        <button class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
+      </div>
+
+      <div class="modal-body text-center">
+        <video id="cameraPreview" autoplay class="w-100 rounded mb-3"></video>
+        <button id="captureButton" class="btn btn-success">
+          <i class="bi bi-camera-fill"></i> Capture
+        </button>
+      </div>
+    </div>
+  </div>
+</div>
+
+{% endblock %}
+
+{% block extra_scripts %}
+<script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.6.172/pdf.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/tesseract.js@4.0.2/dist/tesseract.min.js"></script>
+
+<script>
+(function() {
+
+  let selectedFile = null;
+  let cameraStream = null;
+
+  const dropzone = document.getElementById("dropzone");
+  const fileInput = document.getElementById("fileInput");
+  const previewArea = document.getElementById("previewArea");
+  const btnStart = document.getElementById("startProcessing");
+  const progressBox = document.getElementById("progressBox");
+  const progressBar = document.getElementById("progressBar");
+  const progressText = document.getElementById("progressText");
+
+  const openCameraBtn = document.getElementById("openCamera");
+  const cameraModal = new bootstrap.Modal(document.getElementById("cameraModal"));
+  const cameraPreview = document.getElementById("cameraPreview");
+  const captureButton = document.getElementById("captureButton");
+
+  // ENABLE BUTTON WHEN FILE SELECTED
+  function updatePreview(file) {
+    if (!file) return;
+
+    selectedFile = file;
+    btnStart.disabled = false;
+
+    previewArea.innerHTML = "";
+    let ext = file.name.split('.').pop().toLowerCase();
+
+    if (ext === "pdf") {
+      previewArea.innerHTML = `
+        <div class="col-md-3">
+          <div class="border rounded p-3 text-center bg-white">
+            <i class="bi bi-file-earmark-pdf display-5 text-danger"></i>
+            <p class="small mt-2">${file.name}</p>
+          </div>
+        </div>`;
+    } else {
+      const url = URL.createObjectURL(file);
+      previewArea.innerHTML = `
+        <div class="col-md-3">
+          <img src="${url}" class="img-fluid rounded shadow-sm"/>
+          <p class="small mt-2 text-truncate">${file.name}</p>
+        </div>`;
+    }
+  }
+
+  dropzone.addEventListener("click", () => fileInput.click());
+
+  dropzone.addEventListener("dragover", (e) => {
+    e.preventDefault();
+    dropzone.classList.add("bg-primary", "text-white");
+  });
+
+  dropzone.addEventListener("dragleave", () => {
+    dropzone.classList.remove("bg-primary", "text-white");
+  });
+
+  dropzone.addEventListener("drop", (e) => {
+    e.preventDefault();
+    dropzone.classList.remove("bg-primary", "text-white");
+    selectedFile = e.dataTransfer.files[0];
+    updatePreview(selectedFile);
+  });
+
+  fileInput.addEventListener("change", (e) => {
+    selectedFile = e.target.files[0];
+    updatePreview(selectedFile);
+  });
+
+  // CAMERA CAPTURE
+  openCameraBtn.addEventListener("click", async () => {
+    cameraModal.show();
+    cameraStream = await navigator.mediaDevices.getUserMedia({ video: true });
+    cameraPreview.srcObject = cameraStream;
+  });
+
+  captureButton.addEventListener("click", async () => {
+    const video = cameraPreview;
+
+    const canvas = document.createElement("canvas");
+    canvas.width = video.videoWidth;
+    canvas.height = video.videoHeight;
+
+    const ctx = canvas.getContext("2d");
+    ctx.drawImage(video, 0, 0);
+
+    canvas.toBlob((blob) => {
+      if (!blob) {
+        alert("Failed to capture image. Please try again.");
+        return;
+      }
+
+      selectedFile = new File([blob], "camera_capture.jpg", { type: "image/jpeg" });
+      updatePreview(selectedFile);
+
+      // Stop camera
+      cameraStream.getTracks().forEach(t => t.stop());
+      cameraModal.hide();
+    }, "image/jpeg", 0.95);
+  });
+
+  // PROCESS OCR + SEND TO DJANGO
+  btnStart.addEventListener("click", async () => {
+
+    if (!selectedFile) return;
+
+    progressBox.classList.remove("d-none");
+    progressText.innerText = "Starting OCR...";
+
+    let extractedText = "";
+    const ext = selectedFile.name.split('.').pop().toLowerCase();
+
+    // PDF PROCESSING
+    if (ext === "pdf") {
+      const pdf = await pdfjsLib.getDocument(await selectedFile.arrayBuffer()).promise;
+
+      for (let pageNum = 1; pageNum <= pdf.numPages; pageNum++) {
+        progressText.innerText = `Processing Page ${pageNum} of ${pdf.numPages}...`;
+        progressBar.style.width = `${(pageNum / pdf.numPages) * 70}%`;
+
+        const page = await pdf.getPage(pageNum);
+        const viewport = page.getViewport({ scale: 2 });
+
+        const canvas = document.createElement("canvas");
+        const ctx = canvas.getContext("2d");
+        canvas.height = viewport.height;
+        canvas.width = viewport.width;
+
+        await page.render({ canvasContext: ctx, viewport }).promise;
+
+        let { data } = await Tesseract.recognize(canvas, "eng");
+        extractedText += data.text + "\n\n";
+      }
+    } 
+    else {
+      // IMAGE OCR
+      let img = URL.createObjectURL(selectedFile);
+      let { data } = await Tesseract.recognize(img, "eng");
+      extractedText = data.text;
+    }
+
+    progressBar.style.width = "90%";
+    progressText.innerText = "Sending extracted text to server...";
+
+    // SEND ONLY TEXT (NO RAW FILE)
+    const response = await fetch(
+      "{% url 'visit_workspace:ocr_text_upload' pk=patient.id %}",
+      {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          "X-CSRFToken": "{{ csrf_token }}",
+        },
+        body: JSON.stringify({
+          text: extractedText,
+          doc_type: document.getElementById("docType").value,
+          description: document.getElementById("description").value
+        })
+      }
+    );
+
+    const result = await response.json();
+
+    if (result.redirect_url) {
+      progressBar.style.width = "100%";
+      progressText.innerText = "Completed. Redirecting...";
+      setTimeout(() => window.location.href = result.redirect_url, 1000);
+    }
+  });
+
+})();
+</script>
+{% endblock %}
