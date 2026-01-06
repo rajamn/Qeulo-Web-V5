@@ -1,0 +1,75 @@
+{% extends "base_sidebar.html" %}
+
+{% block title %}Add New Drug{% endblock %}
+
+{% block content %}
+<div class="container mt-4">
+  <h2>Add New Drug</h2>
+
+  <form method="post" novalidate>
+    {% csrf_token %}
+    {{ form.non_field_errors }}
+
+    <div class="row">
+      {% comment %} Left column fields {% endcomment %}
+      <div class="col-md-6">
+        <div class="mb-3">
+          {{ form.drug_name.label_tag }}
+          {{ form.drug_name }}
+          {{ form.drug_name.errors }}
+        </div>
+
+        <div class="mb-3">
+          {{ form.composition.label_tag }}
+          {{ form.composition }}
+          {{ form.composition.errors }}
+        </div>
+
+        <div class="mb-3">
+          {{ form.manufacturer.label_tag }}
+          {{ form.manufacturer }}
+          {{ form.manufacturer.errors }}
+        </div>
+
+        <div class="mb-3">
+          {{ form.side_effects.label_tag }}
+          {{ form.side_effects }}
+          {{ form.side_effects.errors }}
+        </div>
+      </div>
+
+      {% comment %} Right column fields {% endcomment %}
+      <div class="col-md-6">
+        <div class="mb-3">
+          {{ form.dosage.label_tag }}
+          {{ form.dosage }}
+          {{ form.dosage.errors }}
+        </div>
+
+        <div class="mb-3">
+          {{ form.frequency.label_tag }}
+          {{ form.frequency }}
+          {{ form.frequency.errors }}
+        </div>
+
+        <div class="mb-3">
+          {{ form.duration.label_tag }}
+          {{ form.duration }}
+          {{ form.duration.errors }}
+        </div>
+
+        <div class="mb-3">
+          {{ form.uses.label_tag }}
+          {{ form.uses }}
+          {{ form.uses.errors }}
+        </div>
+      </div>
+    </div>
+
+    <input type="hidden" name="next" value="{{ next }}">
+
+    <button type="submit" class="btn btn-primary">Save</button>
+    <a href="{{ next|default:'/' }}" class="btn btn-secondary ms-2">Cancel</a>
+  </form>
+</div>
+{% endblock %}

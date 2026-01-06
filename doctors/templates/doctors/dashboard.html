@@ -1,0 +1,166 @@
+{% extends "base_sidebar.html" %}
+{% block title %}Doctor Dashboard{% endblock %}
+
+{% block content %}
+
+<h2 class="mb-4 text-primary">
+  <i class="bi bi-person-badge"></i> Doctor Dashboard
+</h2>
+
+<!-- Stats Row -->
+<div class="row mb-4">
+  <div class="col-md-4">
+    <div class="card shadow-sm border-0">
+      <div class="card-body text-center">
+        <h5 class="text-secondary">Patients Today</h5>
+        <h2 class="text-primary">{{ stats.total_today }}</h2>
+      </div>
+    </div>
+  </div>
+  <div class="col-md-4">
+    <div class="card shadow-sm border-0">
+      <div class="card-body text-center">
+        <h5 class="text-success">Completed</h5>
+        <h2>{{ stats.completed_today }}</h2>
+      </div>
+    </div>
+  </div>
+  <div class="col-md-4">
+    <div class="card shadow-sm border-0">
+      <div class="card-body text-center">
+        <h5 class="text-warning">Pending</h5>
+        <h2>{{ stats.pending_today }}</h2>
+      </div>
+    </div>
+  </div>
+</div>
+
+
+<!-- Today's Appointments -->
+<div class="card shadow-sm mb-4">
+  <div class="card-header bg-white">
+    <h5 class="mb-0"><i class="bi bi-list-ol"></i> Today's Appointments</h5>
+  </div>
+
+  <div class="table-responsive">
+    <table class="table table-hover mb-0">
+      <thead>
+        <tr>
+          <th>Token</th>
+          <th>Patient</th>
+          <th>Age</th>
+          <th>Status</th>
+          <th>Action</th>
+        </tr>
+      </thead>
+
+      <tbody>
+        {% for appt in appointments %}
+        <tr>
+          <td>{{ appt.token_num }}</td>
+          <td>{{ appt.patient.patient_name }}</td>
+          <td>{{ appt.patient.age_years }}y</td>
+          <td>
+            {% if appt.completed == -1 %}
+              <span class="badge bg-secondary">Registered</span>
+            {% elif appt.completed == 0 %}
+              <span class="badge bg-warning text-dark">In Queue</span>
+            {% elif appt.completed == 1 %}
+              <span class="badge bg-success">Completed</span>
+            {% endif %}
+          </td>
+          <td>
+              <div class="d-flex align-items-center">
+
+                  {# ---- CALL PATIENT BUTTON (only when in queue) ---- #}
+                  {% if appt.completed == 0 %}
+                  <button type="button"
+                          class="btn btn-sm btn-warning me-2 call-patient-btn"
+                          data-token="{{ appt.token_num }}"
+                          data-patient="{{ appt.patient.patient_name|escapejs }}"
+                          data-doctor="{{ doctor.doctor_name|escapejs }}"
+                          data-appt="{{ appt.id }}">
+                      <i class="bi bi-megaphone"></i> Call
+                  </button>
+                  {% endif %}
+
+              {# ---- START PRESCRIPTION ---- #}
+
+                {% if request.user.doctor %}
+
+                    {% if appt.completed == 0 %}
+                        <a href="{% url 'prescription:ai_rx_start' %}?patient={{ appt.patient.id }}&ai_mode=true&source=doctor"
+                          class="btn btn-sm btn-primary me-2">
+                            <i class="bi bi-pen"></i> Start Rx
+                        </a>
+                    {% elif appt.completed == 1 %}
+                        <a href="{% url 'prescription:ai_rx_start' %}?patient={{ appt.patient.id }}&source=doctor"
+                          class="btn btn-sm btn-primary me-2">
+                            <i class="bi bi-pen"></i> Start Rx
+                        </a>
+                    {% endif %}
+
+
+                {% endif %}
+
+
+              </div>
+          </td>
+
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+</div>
+
+
+<!-- Recent Prescriptions -->
+<div class="card shadow-sm">
+  <div class="card-header bg-white">
+    <h5 class="mb-0"><i class="bi bi-clock-history"></i> Recent Prescriptions</h5>
+  </div>
+
+  <ul class="list-group list-group-flush">
+  {% for rx in recent_rx %}
+  <li class="list-group-item d-flex justify-content-between align-items-center">
+
+    <div>
+      <strong>{{ rx.patient.patient_name }}</strong><br>
+      <small class="text-muted">{{ rx.prescribed_on|date:"d M Y" }}</small>
+    </div>
+
+    <div class="d-flex gap-2">
+      <!-- View old prescription -->
+      <a href="{% url 'prescription:ai_prescription_print_builder' rx.id %}"
+         class="btn btn-sm btn-outline-secondary">
+        <i class="bi bi-file-earmark-medical"></i> View
+      </a>
+
+      <!-- Create new one by carrying forward -->
+      <a href="{% url 'prescription:ai_rx_start' %}?patient={{ rx.patient.id }}&carry=1"
+         class="btn btn-sm btn-success">
+        <i class="bi bi-plus-circle"></i> New Rx
+      </a>
+    </div>
+
+  </li>
+  {% empty %}
+  <li class="list-group-item text-muted">No prescriptions yet</li>
+  {% endfor %}
+</ul>
+
+</div>
+<script>
+document.querySelectorAll(".call-patient-btn").forEach(btn => {
+    btn.addEventListener("click", () => {
+        const token = btn.dataset.token;
+        const patient = btn.dataset.patient;
+        const doctor = btn.dataset.doctor;
+
+        alert(`📢 Calling Token ${token} — ${patient}\nDoctor: ${doctor}`);
+        // Later: AJAX to log call, trigger announcements, send WhatsApp, etc.
+    });
+});
+</script>
+{% endblock %}

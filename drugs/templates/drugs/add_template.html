@@ -1,0 +1,218 @@
+{% extends "base_sidebar.html" %}
+{% load static %}
+
+{% block title %}Add Drug Template{% endblock %}
+
+{% block content %}
+
+  {% if messages %}
+    {% for message in messages %}
+      <div class="alert alert-{{ message.tags }}">{{ message }}</div>
+    {% endfor %}
+  {% endif %}
+
+  <form method="post" novalidate autocomplete="off">
+    {% csrf_token %}
+
+    <!-- Template Name -->
+    <div class="card mb-4">
+      <div class="card-header d-flex flex-wrap gap-2 justify-content-between align-items-center">
+  <div class="d-flex align-items-center gap-2 flex-grow-1">
+    <label for="global-drug-search" class="mb-0 fw-semibold">Search drug catalog</label>
+    <input id="global-drug-search" type="text" class="form-control form-control-sm"
+           placeholder="Type to search drugs (Ctrl+K)" style="max-width: 420px;">
+  </div>
+</div>
+
+      <div class="card-body">
+        <div class="mb-3">
+          <label class="form-label" for="{{ template_form.name.id_for_label }}">Template Name</label>
+          {{ template_form.name }}
+          {% for e in template_form.name.errors %}<div class="text-danger small">{{ e }}</div>{% endfor %}
+        </div>
+      </div>
+    </div>
+
+    <!-- Prescription Details Formset -->
+    <div class="card">
+      <div class="card-header d-flex justify-content-between align-items-center">
+        <span class="fw-semibold">Drugs</span>
+        <button type="button" id="add-row" class="btn btn-sm btn-outline-primary">
+          <i class="bi bi-plus-circle"></i> Add Row
+        </button>
+      </div>
+
+      <div class="card-body">
+        {{ formset.management_form }}
+
+        <div class="table-responsive">
+          <table class="table table-bordered align-middle" id="drug-table">
+            <thead class="table-light">
+              <tr>
+                <th>Drug Name</th>
+                <th>Composition</th>
+                <th>Dosage</th>
+                <th>Frequency</th>
+                <th>Duration</th>
+                <th>Food order</th>
+                <th style="width: 60px;">Action</th>
+              </tr>
+            </thead>
+            <tbody id="formset-body">
+              {% for form in formset.forms %}
+              <tr class="formset-row">
+                {{ form.id }}
+                <td>
+                  {{ form.drug_name }}
+                  {% for e in form.drug_name.errors %}<div class="text-danger small">{{ e }}</div>{% endfor %}
+                </td>
+                <td>
+                  {{ form.composition }}
+                  {% for e in form.composition.errors %}<div class="text-danger small">{{ e }}</div>{% endfor %}
+                </td>
+                <td>
+                  {{ form.dosage }}
+                  {% for e in form.dosage.errors %}<div class="text-danger small">{{ e }}</div>{% endfor %}
+                </td>
+                <td>
+                  {{ form.frequency }}
+                  {% for e in form.frequency.errors %}<div class="text-danger small">{{ e }}</div>{% endfor %}
+                </td>
+                <td>
+                  {{ form.duration }}
+                  {% for e in form.duration.errors %}<div class="text-danger small">{{ e }}</div>{% endfor %}
+                </td>
+                <td>
+                  {{ form.food_order }}
+                  {% for e in form.food_order.errors %}<div class="text-danger small">{{ e }}</div>{% endfor %}
+                </td>
+                <td class="text-center">
+                  <span class="d-none">{{ form.DELETE }}</span>
+                  <button type="button" class="btn btn-outline-danger btn-sm remove-row" title="Remove">
+                    <i class="bi bi-trash"></i>
+                  </button>
+                </td>
+                {% for h in form.hidden_fields %}{{ h }}{% endfor %}
+              </tr>
+              {% endfor %}
+            </tbody>
+          </table>
+        </div>
+
+        <!-- Hidden template row (uses __prefix__) -->
+        <template id="empty-form-template">
+          <tr class="formset-row">
+            {% with f=formset.empty_form %}
+            {{ f.id }}
+            <td>{{ f.drug_name }}</td>
+            <td>{{ f.composition }}</td>
+            <td>{{ f.dosage }}</td>
+            <td>{{ f.frequency }}</td>
+            <td>{{ f.duration }}</td>
+            <td>{{ f.food_order }}</td>
+            <td class="text-center">
+              <span class="d-none">{{ f.DELETE }}</span>
+              <button type="button" class="btn btn-outline-danger btn-sm remove-row" title="Remove">
+                <i class="bi bi-trash"></i>
+              </button>
+            </td>
+            {% for h in f.hidden_fields %}{{ h }}{% endfor %}
+            {% endwith %}
+          </tr>
+        </template>
+      </div>
+
+      <div class="card-footer d-flex justify-content-end gap-2">
+        <a href="{% url 'drug_templates' %}" class="btn btn-light">Cancel</a>
+        <button type="submit" class="btn btn-success">Save Template</button>
+      </div>
+    </div>
+  </form>
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<link href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/font/bootstrap-icons.css" rel="stylesheet">
+<link href="https://code.jquery.com/ui/1.13.2/themes/base/jquery-ui.css" rel="stylesheet">
+<script src="https://code.jquery.com/jquery-3.6.0.min.js"></script>
+<script src="https://code.jquery.com/ui/1.13.2/jquery-ui.min.js"></script>
+
+<script>
+document.addEventListener('DOMContentLoaded', () => {
+  // ---- Detect management form & prefix (details/form/etc.) ----
+  const mgmtInput = document.querySelector('input[name$="-TOTAL_FORMS"]');
+  if (!mgmtInput) {
+    console.error('Formset management form not found. Did you render {{ formset.management_form }}?');
+    return;
+  }
+  const prefix = mgmtInput.name.replace(/-TOTAL_FORMS$/, ''); // e.g. "details"
+  const formCount = mgmtInput;
+
+  // ---- Elements ----
+  const addBtn = document.getElementById('add-row');
+  const tableBody = document.getElementById('formset-body');
+  const tmpl = document.getElementById('empty-form-template');
+
+  if (!addBtn)   { console.error('#add-row not found'); return; }
+  if (!tableBody){ console.error('#formset-body not found'); return; }
+  if (!tmpl)     { console.error('#empty-form-template not found'); return; }
+
+  // ---- Fallback: get raw HTML for the prototype once ----
+  // We try <template>.content first; if unavailable, we read innerHTML as a string.
+  let prototypeHTML = null;
+  try {
+    const frag = document.importNode(tmpl.content, true);
+    const protoRow = frag.querySelector('tr.formset-row');
+    if (!protoRow) throw new Error('template content has no tr.formset-row');
+    prototypeHTML = protoRow.outerHTML;
+  } catch (e) {
+    console.warn('Using string fallback for prototype:', e);
+    prototypeHTML = tmpl.innerHTML; // still contains the __prefix__ placeholders
+  }
+
+  // ---- Add Row handler (robust) ----
+  addBtn.addEventListener('click', (e) => {
+    e.preventDefault();
+
+    const idx = parseInt(formCount.value || "0", 10);
+    if (Number.isNaN(idx)) {
+      console.error('TOTAL_FORMS is NaN. Current value:', formCount.value);
+      return;
+    }
+
+    // Create row HTML by replacing __prefix__
+    const html = prototypeHTML
+      .replaceAll(/__prefix__/g, idx)
+      // Some browsers leave stray text nodes; ensure a full row wrapper exists
+      .replace(/^\s*|\s*$/g, '');
+
+    // Convert HTML string to a node safely
+    const tmpContainer = document.createElement('tbody');
+    tmpContainer.innerHTML = html;
+    const newRow = tmpContainer.querySelector('tr.formset-row');
+    if (!newRow) {
+      console.error('Could not create a new row from prototype HTML');
+      return;
+    }
+
+    // Clear values (just in case)
+    newRow.querySelectorAll('input, textarea').forEach(el => {
+      if (el.type !== 'checkbox') el.value = '';
+      else el.checked = false;
+    });
+
+    tableBody.appendChild(newRow);
+    formCount.value = String(idx + 1);
+
+    // Focus drug input if present
+    const drugInput = newRow.querySelector('input.drug-name-autocomplete');
+    if (drugInput) drugInput.focus();
+
+    console.log(`Row added. ${prefix}-TOTAL_FORMS is now`, formCount.value);
+  });
+
+  console.log('Add-row wiring complete. Initial', prefix + '-TOTAL_FORMS =', formCount.value);
+});
+</script>
+
+{% endblock %}

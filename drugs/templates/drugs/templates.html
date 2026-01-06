@@ -1,0 +1,59 @@
+{% extends "base_sidebar.html" %}
+
+{% block content %}
+<div class="container mt-4">
+  <h2>Your Drug Templates</h2>
+
+  <div class="mb-3">
+    <a href="{% url 'add_drug_template' %}" class="btn btn-primary">
+      <i class="bi bi-plus-circle"></i> Add New Template
+    </a>
+  </div>
+
+  {% if templates %}
+  <div class="table-responsive">
+    <table class="table table-hover">
+      <thead>
+        <tr>
+          <th>Name</th>
+          <th>Drugs</th>
+          <th>Actions</th>
+        </tr>
+      </thead>
+      <tbody>
+        {% for template in templates %}
+        <tr>
+          <td>{{ template.name }}</td>
+          <td>
+            {% for drug in template.drugs.all %}
+              {{ drug.drug_name }}{% if not forloop.last %}, {% endif %}
+            {% empty %}
+              <em>No drugs</em>
+            {% endfor %}
+          </td>
+          <td>
+            <a href="{% url 'view_drug_template' template.id %}" class="btn btn-sm btn-info">View</a>
+
+            <form method="post" action="{% url 'delete_drug_template' template.id %}" class="inline-form" onsubmit="return confirm('Are you sure you want to delete this template?');">
+              {% csrf_token %}
+              <button type="submit" class="btn btn-sm btn-danger" aria-label="Delete {{ template.name }}">
+                Delete
+              </button>
+            </form>
+          </td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+  {% else %}
+    <p>No templates found. <a href="{% url 'add_drug_template' %}">Add a new template</a>.</p>
+  {% endif %}
+</div>
+
+<style>
+  .inline-form {
+    display: inline;
+  }
+</style>
+{% endblock %}
