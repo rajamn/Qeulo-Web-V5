@@ -1,0 +1,95 @@
+{% load static %}
+<!DOCTYPE html>
+<html>
+<head>
+  <title>Clinic Queue Display</title>
+  <style>
+    body { background: #222; color: #fff; font-family: Arial, sans-serif; }
+    table { width: 92vw; margin: 3em auto; font-size: 2.5em; background: #111; border-radius: 16px; box-shadow: 0 6px 24px #0004; }
+    th, td { padding: 0.5em 1em; text-align: center; }
+    th { background: #333; }
+    tr:nth-child(even) { background: #222; }
+    .status { font-weight: bold; }
+    .status-0 { color: #ffc107; }
+    .status-1 { color: #28a745; }
+    .status--1 { color: #6c757d; }
+    .status-2 { color: #dc3545; }
+    .called-patient {background: #ffff99 !important;color: #222 !important;font-weight: bold;animation: blink-highlight 1s steps(5, start) infinite;}
+    @keyframes blink-highlight {
+      50% { background: #fff1c1; }
+    }
+  </style>
+</head>
+<body>
+  <table>
+    <thead>
+      <tr>
+        <th>Token</th>
+        <th>Patient</th>
+        <th>Doctor</th>
+        <th>Queue Pos</th>
+        <th>ETA</th>
+        <th>Status</th>
+      </tr>
+    </thead>
+    <tbody>
+      {% regroup appointments by doctor.doctor_name as doctor_list %}
+      {% for group in doctor_list %}
+        <tr>
+          <td colspan="6" style="background:#333; color:#fff; font-size:1.3em; text-align:left;">
+           {{ group.grouper }}
+          </td>
+        </tr>
+        {% for appt in group.list %}
+          <tr {% if appt.called %}class="called-patient"{% endif %} data-appoint-id="{{ appt.appoint_id }}">
+            <td>{{ appt.token_num }}</td>
+            <td>{{ appt.patient.patient_name|default:"-" }}</td>
+            <td>{{ appt.doctor.doctor_name|default:"-" }}</td>
+            <td>{{ appt.que_pos }}</td>
+            <td>{{ appt.eta|default:"-" }}</td>
+            <td class="status">
+              {% if appt.called %}
+                <span class="badge bg-info text-dark" style="font-size:1em;">Now Meeting</span>
+              {% else %}
+                In Queue
+              {% endif %}
+            </td>
+          </tr>
+        {% endfor %}
+      {% endfor %}
+    </tbody>
+  </table>
+  <audio id="call-chime" src="{% static 'queue_mgt/sounds/call_patient.mp3' %}"></audio>
+  <script>
+    document.addEventListener('DOMContentLoaded', function() {
+      // Chime + TTS for new called patients
+      let announced = JSON.parse(localStorage.getItem('announcedCalls') || '[]');
+      const chime = document.getElementById('call-chime');
+      document.querySelectorAll('tr.called-patient').forEach(function(row) {
+        let appoint_id = row.getAttribute('data-appoint-id');
+        if (appoint_id && !announced.includes(appoint_id)) {
+          if (chime) { chime.play(); }
+          setTimeout(function() {
+            let token = row.cells[0]?.textContent.trim();
+            let patient = row.cells[1]?.textContent.trim();
+            let doctor = row.cells[2]?.textContent.trim();
+            if (token && patient && doctor) {
+              const msg = new SpeechSynthesisUtterance(
+                `Token number ${token}, ${patient}, please proceed to ${doctor}`
+              );
+              msg.lang = 'en-IN';
+              window.speechSynthesis.speak(msg);
+            }
+          }, 1500);
+          announced.push(appoint_id);
+          localStorage.setItem('announcedCalls', JSON.stringify(announced));
+        }
+      });
+      if (document.querySelectorAll('tr.called-patient').length === 0) {
+        localStorage.removeItem('announcedCalls');
+      }
+      setTimeout(() => window.location.reload(), 20000);
+    });
+  </script>
+</body>
+</html>

@@ -1,0 +1,106 @@
+{% extends "base_sidebar.html" %}
+{% block title %}Waiting Time Report{% endblock %}
+
+{% block content %}
+<div class="container mt-4">
+
+  <h2 class="text-primary mb-3">
+    <i class="bi bi-clock-history"></i> Waiting Time Report
+  </h2>
+
+  <!-- Filters -->
+  <form method="get" class="row g-3 mb-4">
+      <div class="col-md-3">
+          <label class="form-label">Start Date</label>
+          <input type="date" name="start" class="form-control"
+                 value="{{ start|date:'Y-m-d' }}">
+      </div>
+
+      <div class="col-md-3">
+          <label class="form-label">End Date</label>
+          <input type="date" name="end" class="form-control"
+                 value="{{ end|date:'Y-m-d' }}">
+      </div>
+
+      <div class="col-md-2 align-self-end">
+          <button class="btn btn-primary w-100">Filter</button>
+      </div>
+  </form>
+
+  <!-- Chart -->
+  <div class="card shadow-sm mb-4">
+      <div class="card-body" style="height: 280px;">
+          <h5 class="card-title">Average Waiting Time per Doctor (minutes)</h5>
+          <canvas id="waitChart"></canvas>
+      </div>
+  </div>
+
+  <!-- Table -->
+  <div class="card shadow-sm">
+      <div class="card-body">
+          <h5 class="card-title">Detailed Waiting Times</h5>
+
+          <div class="table-responsive">
+              <table class="table table-striped">
+                  <thead class="table-light">
+                      <tr>
+                          <th>Doctor</th>
+                          <th>Patient</th>
+                          <th>Token</th>
+                          <th>Queue Start</th>
+                          <th>Completed At</th>
+                          <th>Wait (min)</th>
+                      </tr>
+                  </thead>
+                  <tbody>
+                      {% for r in rows %}
+                      <tr>
+                          <td>{{ r.doctor }}</td>
+                          <td>{{ r.patient }}</td>
+                          <td>{{ r.token }}</td>
+                          <td>{{ r.queue_start }}</td>
+                          <td>{{ r.completed_at }}</td>
+                          <td><b>{{ r.wait_minutes }}</b></td>
+                      </tr>
+                      {% empty %}
+                      <tr>
+                          <td colspan="6" class="text-center text-muted">
+                              No waiting time records found.
+                          </td>
+                      </tr>
+                      {% endfor %}
+                  </tbody>
+              </table>
+          </div>
+
+      </div>
+  </div>
+
+</div>
+{% endblock %}
+
+{% block extra_scripts %}
+<script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+<script>
+const chartData = JSON.parse(`{{ chart_data_json|escapejs }}`);
+
+new Chart(document.getElementById("waitChart"), {
+    type: "bar",
+    data: {
+        labels: chartData.labels,
+        datasets: [{
+            label: "Avg Waiting Time (min)",
+            data: chartData.values,
+            backgroundColor: "rgba(255, 159, 64, 0.6)",
+            borderColor: "rgba(255, 159, 64, 1)",
+            borderWidth: 1
+        }]
+    },
+    options: {
+        responsive: true,
+        maintainAspectRatio: false,
+        scales: { y: { beginAtZero: true } }
+    }
+});
+</script>
+{% endblock %}

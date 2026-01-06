@@ -1,0 +1,171 @@
+{% extends 'base_sidebar.html' %}
+{% block title %}Queue Management{% endblock %}
+
+{% block content %}
+<h2 class="mb-4 text-primary">Queue Management</h2>
+
+<!-- 🔍 Filter Bar (outside table) -->
+<div class="d-flex justify-content-start mb-3 gap-3 flex-wrap">
+  <!-- Doctor Filter -->
+  <div>
+    <label for="doctorFilter" class="form-label mb-1">Doctor:</label>
+    <select id="doctorFilter" class="form-select form-select-sm">
+      <option value="">All Doctors</option>
+      {% for doctor in doctors %}
+        <option value="{{ doctor.doctor_name }}">{{ doctor.doctor_name }}</option>
+      {% endfor %}
+    </select>
+  </div>
+
+  <!-- Status Filter -->
+  <div>
+    <label for="statusFilter" class="form-label mb-1">Status:</label>
+    <select id="statusFilter" class="form-select form-select-sm">
+      <option value="">All Statuses</option>
+      <option value="Registered">Registered</option>
+      <option value="In Queue">In Queue</option>
+      <option value="Completed">Completed</option>
+      <option value="Cancelled">Cancelled</option>
+    </select>
+  </div>
+
+  <!-- Patient Search -->
+  <div>
+    <label for="patientSearch" class="form-label mb-1">Search Patient:</label>
+    <input type="text" id="patientSearch" class="form-control form-control-sm" placeholder="Type patient name">
+  </div>
+</div>
+
+<!-- 🩺 Appointment Table -->
+<table class="table table-bordered table-hover bg-white">
+  <thead class="table-light">
+    <tr>
+      <th>Doctor</th>
+      <th>Patient</th>
+      <th>Token</th>
+      <th>ETA</th>
+      <th>Queue Pos</th>
+      <th>Status</th>
+      <th>Actions</th>
+    </tr>
+  </thead>
+  <tbody>
+    {% for appt in appointments %}
+      <tr 
+        class="{% if appt.is_due %}table-danger{% endif %}"
+        data-doctor="{{ appt.doctor.doctor_name }}" 
+        data-status="{% if appt.completed == -1 %}Registered{% elif appt.completed == 0 %}In Queue{% elif appt.completed == 1 %}Completed{% elif appt.completed == 2 %}Cancelled{% endif %}"
+        data-patient="{{ appt.patient.patient_name|lower }}"
+      >
+
+        <td>{{ appt.doctor.doctor_name }}</td>
+        <td>{{ appt.patient.patient_name }} 
+            {% if appt.is_due %}
+              <span class="badge bg-danger ms-1">Due</span>
+            {% endif %} </td>
+        <td>{{ appt.token_num }}</td>
+        <td>{{ appt.eta }}</td>
+        <td>{{ appt.que_pos }}</td>
+        <td>
+          {% if appt.completed == -1 %}
+            <span class="badge bg-secondary">Registered</span>
+          {% elif appt.completed == 0 %}
+            <span class="badge bg-warning text-dark">In Queue</span>
+          {% elif appt.completed == 1 %}
+            <span class="badge bg-success">Completed</span>
+          {% elif appt.completed == 2 %}
+            <span class="badge bg-danger">Cancelled</span>
+          {% endif %}
+        </td>
+        <td>
+  {% if appt.completed == -1 or appt.completed == 0 %}
+    <div class="d-flex align-items-center">
+
+      <!-- Actions Dropdown -->
+      <div class="btn-group">
+        <button class="btn btn-sm btn-outline-secondary dropdown-toggle"
+                type="button" data-bs-toggle="dropdown">
+          Actions
+        </button>
+        <ul class="dropdown-menu">
+          {% if appt.completed == -1 %}
+            <li>
+              <a class="dropdown-item text-primary"
+                 href="{% url 'update_status' appt.appoint_id 0 %}{% if qs %}?{{ qs }}{% endif %}">
+                Queue
+              </a>
+            </li>
+          {% endif %}
+          <li>
+            <a class="dropdown-item text-success"
+               href="{% url 'update_status' appt.appoint_id 1 %}{% if qs %}?{{ qs }}{% endif %}">
+              Complete
+            </a>
+          </li>
+          <li>
+            <a class="dropdown-item text-danger"
+               href="{% url 'update_status' appt.appoint_id 2 %}{% if qs %}?{{ qs }}{% endif %}">
+              Cancel
+            </a>
+          </li>
+        </ul>
+      </div>
+
+      <!-- Announce Button -->
+          {% if appt.completed == 0 %}
+          <button type="button"
+                  class="btn btn-sm btn-warning ms-2 announce-call-btn"
+                  data-token="{{ appt.token_num }}"
+                  data-patient="{{ appt.patient.patient_name|escapejs }}"
+                  data-doctor="{{ appt.doctor.doctor_name|escapejs }}"
+                  data-appoint-id="{{ appt.appoint_id }}">
+            <i class="bi bi-megaphone"></i>
+          </button>
+          {% endif %}
+
+          
+      </div>
+      {% else %}
+        <span class="text-muted">—</span>
+      {% endif %}
+    </td>
+
+      </tr>
+    {% empty %}
+      <tr><td colspan="7" class="text-center text-muted">No appointments today</td></tr>
+    {% endfor %}
+  </tbody>
+</table>
+
+<!-- ✅ JavaScript Filter Logic -->
+<script>
+  document.addEventListener("DOMContentLoaded", function () {
+    const doctorSelect = document.getElementById("doctorFilter");
+    const statusSelect = document.getElementById("statusFilter");
+    const patientInput = document.getElementById("patientSearch");
+    const rows = document.querySelectorAll("tbody tr");
+
+    function filterRows() {
+      const selectedDoctor = doctorSelect.value.toLowerCase();
+      const selectedStatus = statusSelect.value.toLowerCase();
+      const searchTerm = patientInput.value.trim().toLowerCase();
+
+      rows.forEach(row => {
+        const rowDoctor = row.getAttribute("data-doctor").toLowerCase();
+        const rowStatus = row.getAttribute("data-status").toLowerCase();
+        const rowPatient = row.getAttribute("data-patient").toLowerCase();
+
+        const matchDoctor = !selectedDoctor || rowDoctor === selectedDoctor;
+        const matchStatus = !selectedStatus || rowStatus === selectedStatus;
+        const matchPatient = !searchTerm || rowPatient.includes(searchTerm);
+
+        row.style.display = (matchDoctor && matchStatus && matchPatient) ? "" : "none";
+      });
+    }
+
+    doctorSelect.addEventListener("change", filterRows);
+    statusSelect.addEventListener("change", filterRows);
+    patientInput.addEventListener("input", filterRows);
+  });
+</script>
+{% endblock %}

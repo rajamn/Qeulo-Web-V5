@@ -1,0 +1,260 @@
+{% extends "base_sidebar.html" %}
+{% block title %}Doctor Productivity{% endblock %}
+
+{% block content %}
+<div class="container mt-4">
+
+  <h2 class="text-primary mb-4">
+    <i class="bi bi-person-lines-fill"></i> Doctor Productivity Report
+  </h2>
+
+  <!-- Export Button -->
+  <a href="{% url 'reports:doctor_productivity_export' %}"
+     class="btn btn-success mb-3">
+     <i class="bi bi-file-earmark-excel"></i> Export Excel
+  </a>
+
+  <!-- Filters -->
+  <form method="get" class="row g-3 mb-4">
+    <div class="col-md-3">
+      <label class="form-label">Start Date</label>
+      <input type="date" name="start" value="{{ start|date:'Y-m-d' }}" class="form-control">
+    </div>
+
+    <div class="col-md-3">
+      <label class="form-label">End Date</label>
+      <input type="date" name="end" value="{{ end|date:'Y-m-d' }}" class="form-control">
+    </div>
+
+    <div class="col-md-2 align-self-end">
+      <button class="btn btn-primary w-100">Filter</button>
+    </div>
+  </form>
+
+
+  <!-- ========================
+       Row 1 — Dual Charts
+  ========================= -->
+  <div class="row">
+
+    <!-- Patients & Revenue Mixed Chart -->
+    <div class="col-md-6 mb-4">
+      <div class="card shadow-sm">
+        <div class="card-body">
+          <h5 class="card-title mb-2">
+            <i class="bi bi-bar-chart-line"></i> Patients & Revenue per Doctor
+          </h5>
+
+          <!-- Graph Type Dropdown -->
+          <div class="d-flex mb-2" style="gap: 10px;">
+            <label class="fw-semibold">Chart Type:</label>
+            <select id="graphType" class="form-select form-select-sm" style="width: 160px;">
+              <option value="bar">Bar</option>
+              <option value="line">Line</option>
+              <option value="mixed">Mixed</option>
+              <option value="pie">Pie</option>
+              <option value="doughnut">Doughnut</option>
+              <option value="radar">Radar</option>
+            </select>
+          </div>
+
+          <div style="height: 260px;">
+            <canvas id="productivityChart"></canvas>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Revenue Only Chart -->
+    <div class="col-md-6 mb-4">
+      <div class="card shadow-sm">
+        <div class="card-body">
+          <h5 class="card-title mb-2">
+            <i class="bi bi-cash-stack"></i> Revenue by Doctor
+          </h5>
+
+          <div style="height: 260px;">
+            <canvas id="revenueChart"></canvas>
+          </div>
+        </div>
+      </div>
+    </div>
+
+  </div>
+
+
+  <!-- ========================
+       Table — Doctor Summary
+  ========================= -->
+  <div class="card shadow-sm">
+    <div class="table-responsive">
+      <table class="table table-hover mb-0">
+        <thead class="table-light">
+          <tr>
+            <th>Doctor</th>
+            <th>Total Patients</th>
+            <th>Registered</th>
+            <th>In Queue</th>
+            <th>Completed</th>
+            <th>Cancelled</th>
+            <th>Revenue (₹)</th>
+            <th>Due (₹)</th>
+          </tr>
+        </thead>
+
+        <tbody>
+          {% for row in rows %}
+          <tr>
+            <td>{{ row.doctor.doctor_name }}</td>
+            <td>{{ row.total_patients }}</td>
+            <td>{{ row.registered }}</td>
+            <td>{{ row.queued }}</td>
+            <td class="text-success">{{ row.completed }}</td>
+            <td class="text-danger">{{ row.cancelled }}</td>
+            <td class="fw-bold text-primary">₹ {{ row.revenue }}</td>
+            <td class="fw-bold text-danger">₹ {{ row.due_amount }}</td>
+          </tr>
+          {% empty %}
+          <tr>
+            <td colspan="8" class="text-center text-muted py-3">No data found.</td>
+          </tr>
+          {% endfor %}
+        </tbody>
+
+      </table>
+    </div>
+  </div>
+
+</div>
+{% endblock %}
+
+
+{% block extra_scripts %}
+<script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+
+<script>
+document.addEventListener("DOMContentLoaded", function () {
+
+    const chartData = JSON.parse(`{{ chart_data_json|escapejs }}`);
+
+    let mainChart = null;
+    let revenueChart = null;
+
+    const ctx1 = document.getElementById("productivityChart");
+    const ctx2 = document.getElementById("revenueChart");
+    const selector = document.getElementById("graphType");
+
+
+    /* -----------------------------
+       Build dataset for main chart
+    ----------------------------- */
+    function buildDataset(type) {
+        if (["pie", "doughnut", "radar"].includes(type)) {
+            return [{
+                label: "Patients",
+                data: chartData.patients,
+            }];
+        }
+
+        if (type === "mixed") {
+            return [
+                {
+                    label: "Patients",
+                    data: chartData.patients,
+                    backgroundColor: "rgba(54, 162, 235, 0.6)",
+                    type: "bar",
+                },
+                {
+                    label: "Revenue (₹)",
+                    data: chartData.revenue,
+                    type: "line",
+                    yAxisID: "y1",
+                    borderColor: "rgba(255, 99, 132, 1)",
+                    tension: 0.3
+                }
+            ];
+        }
+
+        return [
+            {
+                label: "Patients",
+                data: chartData.patients,
+                backgroundColor: "rgba(54, 162, 235, 0.6)",
+            },
+            {
+                label: "Revenue (₹)",
+                data: chartData.revenue,
+                type: type,
+                yAxisID: "y1",
+                borderColor: "rgba(255, 99, 132, 1)",
+                tension: 0.3
+            }
+        ];
+    }
+
+
+    /* -----------------------------
+       Render the Main Chart
+    ----------------------------- */
+    function renderMainChart(type) {
+        if (mainChart) mainChart.destroy();
+
+        mainChart = new Chart(ctx1, {
+            type: type === "mixed" ? "bar" : type,
+            data: {
+                labels: chartData.labels,
+                datasets: buildDataset(type)
+            },
+            options: {
+                responsive: true,
+                maintainAspectRatio: false,
+                interaction: { mode: "index", intersect: false },
+                scales: {
+                    y: { beginAtZero: true },
+                    y1: {
+                        beginAtZero: true,
+                        position: "right",
+                        grid: { drawOnChartArea: false }
+                    }
+                }
+            }
+        });
+    }
+
+
+    /* -----------------------------
+       Render Revenue-Only Bar Chart
+    ----------------------------- */
+    function renderRevenueChart() {
+        revenueChart = new Chart(ctx2, {
+            type: "bar",
+            data: {
+                labels: chartData.labels,
+                datasets: [{
+                    label: "Revenue (₹)",
+                    data: chartData.revenue,
+                    backgroundColor: "rgba(40, 167, 69, 0.6)",
+                    borderColor: "rgba(40, 167, 69, 1)",
+                }]
+            },
+            options: {
+                responsive: true,
+                maintainAspectRatio: false,
+                scales: {
+                    y: { beginAtZero: true }
+                }
+            }
+        });
+    }
+
+
+    selector.addEventListener("change", () => {
+        renderMainChart(selector.value);
+    });
+
+    renderMainChart("bar");
+    renderRevenueChart();
+
+});
+</script>
+{% endblock %}

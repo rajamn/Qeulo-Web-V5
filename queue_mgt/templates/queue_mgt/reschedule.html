@@ -1,0 +1,27 @@
+{% extends "base_sidebar.html" %}
+{% block title %}Reschedule{% endblock %}
+
+{% block content %}
+<div class="container py-4">
+  <h2 class="mb-4 text-primary">Doctor Reschedule</h2>
+
+  <form method="post" class="card p-4 shadow-sm">
+    {% csrf_token %}
+    <div class="mb-3">
+      <label class="form-label">Select Doctor</label>
+      <select name="doctor_id" class="form-select">
+        {% for doc in doctors %}
+          <option value="{{ doc.id }}">{{ doc.doctor_name }}</option>
+        {% endfor %}
+      </select>
+    </div>
+    <div class="mb-3">
+      <label class="form-label">Delay (minutes)</label>
+      <input type="number" name="delay" class="form-control" min="1" placeholder="Enter delay in minutes" required>
+    </div>
+    <button type="submit" class="btn btn-warning">
+      <i class="bi bi-send"></i> Send Reschedule Messages
+    </button>
+  </form>
+</div>
+{% endblock %}

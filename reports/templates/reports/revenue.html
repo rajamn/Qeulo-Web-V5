@@ -1,0 +1,241 @@
+{% extends "base_sidebar.html" %}
+{% block title %}Revenue Report{% endblock %}
+
+{% block content %}
+<div class="container mt-4">
+
+  <h2 class="text-primary mb-4">
+    <i class="bi bi-currency-rupee"></i> Revenue Report
+  </h2>
+<a href="{% url 'reports:revenue_export' %}?start={{ start|date:'Y-m-d' }}&end={{ end|date:'Y-m-d' }}"
+   class="btn btn-success mb-3">
+   <i class="bi bi-file-earmark-excel"></i> Export to Excel
+</a>
+
+    
+  <!-- Filters -->
+  <form method="get" class="row g-3 mb-4">
+    <div class="col-md-2">
+      <label class="form-label">Start Date</label>
+      <input type="date" name="start" value="{{ start|date:'Y-m-d' }}" class="form-control">
+    </div>
+
+    <div class="col-md-2">
+      <label class="form-label">End Date</label>
+      <input type="date" name="end" value="{{ end|date:'Y-m-d' }}" class="form-control">
+    </div>
+
+    <div class="col-md-3">
+      <label class="form-label">Doctor</label>
+      <select name="doctor" class="form-select">
+        <option value="">All Doctors</option>
+        {% for d in doctors %}
+        <option value="{{ d.id }}">{{ d.doctor_name }}</option>
+        {% endfor %}
+      </select>
+    </div>
+
+    <div class="col-md-3">
+      <label class="form-label">Service</label>
+      <select name="service" class="form-select">
+        <option value="">All Services</option>
+        {% for s in services %}
+        <option value="{{ s.id }}">{{ s.service_name }}</option>
+        {% endfor %}
+      </select>
+    </div>
+
+    <div class="col-md-2">
+      <label class="form-label">Payment Type</label>
+      <select name="pay_type" class="form-select">
+        <option value="">All</option>
+        <option>Cash</option>
+        <option>UPI</option>
+        <option>Card</option>
+        <option>Due</option>
+      </select>
+    </div>
+
+    <div class="col-md-2 align-self-end">
+      <button class="btn btn-primary w-100">Filter</button>
+    </div>
+  </form>
+  <!-- ==============================
+        Revenue Charts
+    ================================= -->
+    <div class="row">
+
+    <!-- Revenue Trend -->
+    <div class="col-md-6 mb-4">
+        <div class="card shadow-sm">
+        <div class="card-body">
+            <h5 class="card-title mb-2">
+            <i class="bi bi-graph-up"></i> Revenue Trend
+            </h5>
+            <div style="height: 260px;">
+            <canvas id="revTrendChart"></canvas>
+            </div>
+        </div>
+        </div>
+    </div>
+
+    <!-- Revenue by Doctor -->
+    <div class="col-md-6 mb-4">
+        <div class="card shadow-sm">
+        <div class="card-body">
+            <h5 class="card-title mb-2">
+            <i class="bi bi-person-badge"></i> Revenue by Doctor
+            </h5>
+            <div style="height: 260px;">
+            <canvas id="revDoctorChart"></canvas>
+            </div>
+        </div>
+        </div>
+    </div>
+
+    </div>
+
+
+  <!-- KPI Cards -->
+  <div class="row g-3 mb-4">
+    <div class="col-md-3">
+      <div class="card shadow-sm">
+        <div class="card-body">
+          <div class="text-muted small">Total Revenue</div>
+          <div class="fs-4 fw-bold text-success">₹ {{ total_revenue|floatformat:2 }}</div>
+        </div>
+      </div>
+    </div>
+
+    <div class="col-md-3">
+      <div class="card shadow-sm">
+        <div class="card-body">
+          <div class="text-muted small">Total Due</div>
+          <div class="fs-4 fw-bold text-danger">₹ {{ total_due|floatformat:2 }}</div>
+        </div>
+      </div>
+    </div>
+
+    <div class="col-md-3">
+      <div class="card shadow-sm">
+        <div class="card-body">
+          <div class="text-muted small">Number of Bills</div>
+          <div class="fs-4 fw-bold">{{ total_bills }}</div>
+        </div>
+      </div>
+    </div>
+
+    <div class="col-md-3">
+      <div class="card shadow-sm">
+        <div class="card-body">
+          <div class="text-muted small">Avg Revenue / Bill</div>
+          <div class="fs-4 fw-bold">₹ {{ avg_revenue|floatformat:2 }}</div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Revenue Table -->
+  <div class="card shadow-sm border-0">
+    <div class="card-body">
+      <h5 class="mb-3">Transactions</h5>
+
+      <div class="table-responsive">
+        <table class="table table-hover">
+          <thead class="table-light">
+            <tr>
+              <th>Date</th>
+              <th>Patient</th>
+              <th>Doctor</th>
+              <th>Service</th>
+              <th>Payment Type</th>
+              <th class="text-end">Amount</th>
+            </tr>
+          </thead>
+          <tbody>
+            {% for t in transactions %}
+            <tr class="{% if t.pay_type == 'Due' %}table-danger{% endif %}">
+              <td>{{ t.paid_on }}</td>
+              <td>{{ t.patient.patient_name }}</td>
+              <td>{{ t.doctor.doctor_name }}</td>
+              <td>{{ t.service.service_name }}</td>
+              <td>{{ t.pay_type }}</td>
+              <td class="text-end">₹ {{ t.amount|floatformat:2 }}</td>
+            </tr>
+            {% empty %}
+            <tr><td colspan="6" class="text-center text-muted">No transactions found.</td></tr>
+            {% endfor %}
+          </tbody>
+        </table>
+      </div>
+
+    </div>
+  </div>
+
+</div>
+{% endblock %}
+{% block extra_scripts %}
+<script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+
+<script>
+document.addEventListener("DOMContentLoaded", function () {
+
+    const chartData = JSON.parse(`{{ chart_data_json|escapejs }}`);
+
+    /* ==========================
+       1️⃣ Revenue Trend Chart
+    ========================== */
+    const trendCtx = document.getElementById("revTrendChart");
+    if (trendCtx) {
+        new Chart(trendCtx, {
+            type: "line",
+            data: {
+                labels: chartData.dates,
+                datasets: [{
+                    label: "Revenue (₹)",
+                    data: chartData.date_values,
+                    borderColor: "rgba(54, 162, 235, 1)",
+                    backgroundColor: "rgba(54, 162, 235, 0.4)",
+                    tension: 0.3
+                }]
+            },
+            options: {
+                responsive: true,
+                maintainAspectRatio: false,
+                scales: {
+                    y: { beginAtZero: true }
+                }
+            }
+        });
+    }
+
+    /* ==========================
+       2️⃣ Revenue by Doctor
+    ========================== */
+    const docCtx = document.getElementById("revDoctorChart");
+    if (docCtx) {
+        new Chart(docCtx, {
+            type: "bar",
+            data: {
+                labels: chartData.doctor_labels,
+                datasets: [{
+                    label: "Revenue (₹)",
+                    data: chartData.doctor_values,
+                    backgroundColor: "rgba(40, 167, 69, 0.6)",
+                    borderColor: "rgba(40, 167, 69, 1)",
+                    borderWidth: 1
+                }]
+            },
+            options: {
+                responsive: true,
+                maintainAspectRatio: false,
+                scales: {
+                    y: { beginAtZero: true }
+                }
+            }
+        });
+    }
+
+});
+</script>
+{% endblock %}

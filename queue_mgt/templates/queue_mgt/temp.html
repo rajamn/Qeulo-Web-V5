@@ -1,0 +1,167 @@
+{% extends 'base_sidebar.html' %}
+
+{% block content %}
+<div class="container-fluid py-4">
+  <h2 class="mb-4 text-primary">Queue Management</h2>
+
+  <!-- FILTER BAR -->
+   <strong>Filters</strong>
+    </div>
+    <div class="card-body">
+  <form method="get" class="row g-3 align-items-end mb-4">
+    <div class="col-md-3">
+      {{ form.doctor.label_tag }}
+      {{ form.doctor }}
+    </div>
+    <div class="col-md-3">
+      {{ form.status.label_tag }}
+      {{ form.status }}
+    </div>
+    <div class="col-md-3">
+      {{ form.patient.label_tag }}
+      {{ form.patient }}
+    </div>
+  </form>
+  <!-- APPOINTMENT TABLE -->
+   {% with request.GET.urlencode as qs %}
+  <div class="table-responsive shadow-sm bg-white rounded">
+    <table class="table table-bordered table-hover mb-0">
+      <thead class="table-light">
+        <tr>
+          <th>Doctor</th>
+          <th>Patient</th>
+          <th>Token</th>
+          <th>ETA</th>
+          <th>Queue Pos</th>
+          <th>Status</th>
+          <th>Actions</th>
+        </tr>
+      </thead>
+      <tbody>
+        {% for appt in appointments %}
+          <tr
+            data-doctor="{{ appt.doctor.doctor_name }}"
+            data-status="{% if appt.completed == -1 %}Registered{% elif appt.completed == 0 %}In Queue{% elif appt.completed == 1 %}Completed{% else %}Cancelled{% endif %}"
+            data-patient="{{ appt.patient.patient_name|lower }}"
+          >
+            <td>{{ appt.doctor.doctor_name }}</td>
+            <td>{{ appt.patient.patient_name }}</td>
+            <td>{{ appt.token_num }}</td>
+            <td>{{ appt.eta }}</td>
+            <td>{{ appt.que_pos }}</td>
+            <td>
+              {% if appt.completed == -1 %}
+                <span class="badge bg-secondary">Registered</span>
+              {% elif appt.completed == 0 %}
+                <span class="badge bg-warning text-dark">In Queue</span>
+              {% elif appt.completed == 1 %}
+                <span class="badge bg-success">Completed</span>
+              {% else %}
+                <span class="badge bg-danger">Cancelled</span>
+              {% endif %}
+            </td>
+            <td>
+  {% if appt.completed == -1 or appt.completed == 0 %}
+    <div class="btn-group align-items-center">
+      <!-- Actions Dropdown -->
+      <button class="btn btn-sm btn-outline-secondary dropdown-toggle"
+              type="button" data-bs-toggle="dropdown">
+        Actions
+      </button>
+      <ul class="dropdown-menu">
+        {% if appt.completed == -1 %}
+          <li>
+            <a class="dropdown-item text-primary"
+               href="{% url 'update_status' appt.appoint_id 0 %}{% if qs %}?{{ qs }}{% endif %}">
+              Queue
+            </a>
+          </li>
+        {% endif %}
+        <li>
+          <a class="dropdown-item text-success"
+             href="{% url 'update_status' appt.appoint_id 1 %}{% if qs %}?{{ qs }}{% endif %}">
+            Complete
+          </a>
+        </li>
+        <li>
+          <a class="dropdown-item text-danger"
+             href="{% url 'update_status' appt.appoint_id 2 %}{% if qs %}?{{ qs }}{% endif %}">
+            Cancel
+          </a>
+        </li>
+      </ul>
+      <!-- Announce Button OUTSIDE Dropdown -->
+      <button type="button"
+              class="btn btn-sm btn-warning ms-2 announce-call-btn"
+              data-token="{{ appt.token_num }}"
+              data-patient="{{ appt.patient.patient_name|escapejs }}"
+              data-doctor="{{ appt.doctor.doctor_name|escapejs }}"
+              data-appoint-id="{{ appt.appoint_id }}"
+              title="Call & Announce"
+              aria-label="Call & Announce">
+        <i class="bi bi-megaphone"></i>
+      </button>
+    </div>
+  {% else %}
+    <span class="text-muted">—</span>
+  {% endif %}
+</td>
+
+          </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+    {% endwith %}
+  </div>
+</div>
+
+<script>
+document.addEventListener("DOMContentLoaded", function() {
+  const doctorSelect = document.getElementById("doctorFilter");
+  const statusSelect = document.getElementById("statusFilter");
+  const patientInput = document.getElementById("patientSearch");
+  const rows = document.querySelectorAll("tbody tr");
+
+  function filterRows() {
+    // get the *text* of the selected option
+    const selectedDoctor = doctorSelect.options[doctorSelect.selectedIndex]
+                              .text.trim().toLowerCase();
+    const selectedStatus = statusSelect.options[statusSelect.selectedIndex]
+                              .text.trim().toLowerCase();
+    const searchTerm     = patientInput.value.trim().toLowerCase();
+
+    rows.forEach(row => {
+      const rowDoctor  = row.dataset.doctor.toLowerCase();
+      const rowStatus  = row.dataset.status.toLowerCase();
+      const rowPatient = row.dataset.patient.toLowerCase();
+
+      const matchDoctor  = selectedDoctor === "all doctors"  || rowDoctor  === selectedDoctor;
+      const matchStatus  = selectedStatus === "all statuses" || rowStatus  === selectedStatus;
+      const matchPatient = !searchTerm                       || rowPatient.includes(searchTerm);
+
+      row.style.display = (matchDoctor && matchStatus && matchPatient) ? "" : "none";
+    });
+
+    updateActionLinks(); // update links after filtering
+  }
+
+  function updateActionLinks() {
+    const qs = window.location.search;
+    document.querySelectorAll('ul.dropdown-menu a').forEach(link => {
+      let baseUrl = link.href.split('?')[0];
+      link.href = qs ? baseUrl + qs : baseUrl;
+    });
+  }
+
+  // Attach events
+  doctorSelect.addEventListener("change", filterRows);
+  statusSelect.addEventListener("change", filterRows);
+  patientInput.addEventListener("input",  filterRows);
+
+  // On page load
+  filterRows();         // filter and update links
+  updateActionLinks();  // ensure links are right on load
+});
+</script>
+
+{% endblock %}
