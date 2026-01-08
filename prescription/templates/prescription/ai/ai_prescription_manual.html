@@ -244,7 +244,7 @@ AI is disabled for this hospital. Please enter prescription manually.
 
 
 <div class="d-flex justify-content-between mt-4">
-  <a href="{% url 'ai_rx_diagnosis' draft.id %}" class="btn btn-outline-secondary">← Back</a>
+  <a href="{% url 'prescription:ai_rx_diagnosis' draft.id %}" class="btn btn-outline-secondary">← Back</a>
   <button type="submit" class="btn btn-success">Continue → Review</button>
 </div>
 
@@ -392,7 +392,7 @@ document.addEventListener("DOMContentLoaded", function () {
         fd.append("drug_name", name);
         fd.append("composition", comp);
 
-        fetch("{% url 'ajax_add_drug' %}", {
+        fetch("{% url 'prescription:ajax_add_drug' %}", {
             method: "POST",
             headers: { "X-CSRFToken": "{{ csrf_token }}" },
             body: fd
@@ -454,17 +454,17 @@ document.addEventListener("DOMContentLoaded", function () {
 function autosaveDrugs() {
     const payload = JSON.stringify(collectDrugRows());
 
-    fetch("{% url 'autosave_draft' draft.id %}", {
-        method: "POST",
-        headers: {
-            "X-CSRFToken": "{{ csrf_token }}",
-            "Content-Type": "application/x-www-form-urlencoded"
-        },
-        body: new URLSearchParams({
-            field: "drugs",
-            value: payload
-        })
-    });
+    fetch("{% url 'prescription:ai_rx_autosave' draft.id %}", {
+    method: "POST",
+    headers: {
+        "X-CSRFToken": "{{ csrf_token }}",
+        "Content-Type": "application/x-www-form-urlencoded"
+    },
+    body: new URLSearchParams({
+        field: "drugs",
+        value: payload
+    })
+});
 }
 
 // Trigger autosave when inputs change

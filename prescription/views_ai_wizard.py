@@ -441,7 +441,7 @@ def edit_symptoms(request, draft_id):
         draft.current_step = "symptoms"
         draft.save(update_fields=["data", "current_step", "updated_at"])
 
-        return redirect("ai_rx_findings", draft_id=draft.id)
+        return redirect("prescription:ai_rx_findings", draft_id=draft.id)
 
     # -----------------------------
     # Render template
@@ -456,28 +456,8 @@ def edit_symptoms(request, draft_id):
     return render(request, "prescription/ai/symptoms.html", context)
 
 
-# @login_required
-# def autosave_draft(request, draft_id):
-#     """
-#     AJAX autosave endpoint. Expects {field: "history", value: "..."}.
-#     """
-#     draft = get_object_or_404(PrescriptionDraft, pk=draft_id, finalized=False)
 
-#     if draft.doctor != getattr(request.user, "doctor", None):
-#         return JsonResponse({"error": "Unauthorized"}, status=403)
-
-#     field = request.POST.get("field")
-#     value = request.POST.get("value", "").strip()
-
-#     if not field:
-#         return JsonResponse({"error": "Missing field"}, status=400)
-
-#     draft.data[field] = value
-#     draft.save(update_fields=["data", "updated_at"])
-
-#     return JsonResponse({"status": "ok"})
-
-
+#1
 @require_POST
 @login_required
 def autosave_draft(request, draft_id):
@@ -598,7 +578,7 @@ def edit_findings(request, draft_id):
         draft.data["findings"] = findings_text
         draft.current_step = "findings"
         draft.save(update_fields=["data", "current_step", "updated_at"])
-        return redirect("ai_rx_diagnosis", draft_id=draft.id)
+        return redirect("prescription:ai_rx_diagnosis", draft_id=draft.id)
 
     # ------------------------
     # Context
@@ -652,7 +632,7 @@ def edit_diagnosis(request, draft_id):
         if draft.hospital.ai_enabled:
             return redirect("ai_rx_ai_suggestions", draft_id=draft.id)
         else:
-            return redirect("ai_rx_prescription_manual", draft_id=draft.id)
+            return redirect("prescription:ai_rx_prescription_manual", draft_id=draft.id)
 
     context = {
         "draft": draft,
@@ -693,7 +673,7 @@ def ai_suggestions(request, draft_id):
     # 🚫 If AI is OFF → Skip this view entirely 
     # -------------------------------------------------------
     if not draft.hospital.ai_enabled:
-        return redirect("ai_rx_prescription", draft_id=draft.id)
+        return redirect("prescription:ai_rx_prescription", draft_id=draft.id)
 
     # Only assigned doctor can access
     if draft.doctor != getattr(request.user, "doctor", None):
@@ -795,27 +775,6 @@ Provide output in JSON:
         },
     )
 
-
-@login_required
-def autosave_draft(request, draft_id):
-    """
-    AJAX autosave endpoint. Expects {field: "history", value: "..."}.
-    """
-    draft = get_object_or_404(PrescriptionDraft, pk=draft_id, finalized=False)
-
-    if draft.doctor != getattr(request.user, "doctor", None):
-        return JsonResponse({"error": "Unauthorized"}, status=403)
-
-    field = request.POST.get("field")
-    value = request.POST.get("value", "").strip()
-
-    if not field:
-        return JsonResponse({"error": "Missing field"}, status=400)
-
-    draft.data[field] = value
-    draft.save(update_fields=["data", "updated_at"])
-
-    return JsonResponse({"status": "ok"})
 
 @login_required
 def ai_discard(request, draft_id):
