@@ -1,0 +1,32 @@
+<div class="modal fade" id="switchPatientModal" tabindex="-1">
+  <div class="modal-dialog modal-dialog-centered">
+    <div class="modal-content">
+
+      <div class="modal-header">
+        <h5 class="modal-title">Select Patient</h5>
+        <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+      </div>
+
+      <div class="modal-body">
+
+        {% if sidebar_ctx.has_active_draft %}
+          <p class="small">
+            You are currently writing a prescription for:
+            <strong>{{ sidebar_ctx.current_patient.patient_name }}</strong>
+          </p>
+
+          <div class="alert alert-warning small mb-3">
+            Switching patients will affect the current draft.
+          </div>
+        {% endif %}
+
+        <div class="list-group">
+          {% for appt in sidebar_ctx.all_queue %}
+            <a href="{% url 'prescription:ai_rx_start' %}?patient={{ appt.patient.id }}"
+               class="list-group-item list-group-item-action">
+              {{ appt.patient.patient_name }} · {{ appt.patient.age_years }}y
+            </a>
+          {% endfor %}
+        </div>
+
+      </div>

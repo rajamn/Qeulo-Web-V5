@@ -13,6 +13,17 @@ from django.contrib.auth.views import LoginView
 from django.shortcuts import redirect, get_object_or_404
 from django.contrib.auth import login
 from core.models import Hospital
+import json
+import logging
+from django.http import JsonResponse
+from django.views.decorators.csrf import csrf_exempt
+from datetime import date
+from django.urls import reverse
+from appointments.models import AppointmentDetails
+from prescription.models import PrescriptionDraft
+
+
+
 
 class CustomLoginView(LoginView):
     template_name = "core/login.html"
@@ -36,9 +47,65 @@ class CustomLoginView(LoginView):
         # ✅ Redirect all users to internal queue dashboard
         return redirect(self.get_success_url())
 
+    # def get_success_url(self):
+    #     """Redirect to main queue (no slug needed)."""
+    #     return "/queue/"
+    
+
     def get_success_url(self):
-        """Redirect to main queue (no slug needed)."""
-        return "/queue/"
+        user = self.request.user
+
+        # Non-doctor users → Queue (unchanged behavior)
+        if not user.doctor:
+            return "/queue/"
+
+        doctor = user.doctor
+        today = date.today()
+
+        # 1️⃣ RESUME ACTIVE DRAFT (not finalized)
+        active_draft = (
+            PrescriptionDraft.objects
+            .filter(
+                doctor=doctor,
+                hospital=doctor.hospital,
+                finalized=False,
+                updated_at__date=date.today()
+            )
+            .order_by("-updated_at")
+            .first()
+        )
+
+
+        if active_draft:
+            return reverse(
+                "prescription:ai_rx_review",
+                args=[active_draft.id]
+            )
+
+        # 🔍 Find first IN-QUEUE patient for today
+        next_appt = (
+            AppointmentDetails.objects
+            .filter(
+                doctor=doctor,
+                hospital=doctor.hospital,
+                appointment_on=today,
+                completed=AppointmentDetails.STATUS_IN_QUEUE
+            )
+            .order_by("que_pos")
+            .first()
+        )
+
+        # 🚀 Auto-launch Doctor Workspace
+        if next_appt:
+            return (
+                reverse("prescription:ai_rx_start")
+                + f"?patient={next_appt.patient.id}&ai_mode=true&source=login"
+            )
+
+        # 🧭 No waiting patients → Doctor Dashboard
+        return reverse("prescription:dw_entry")
+
+
 
 
 
@@ -121,10 +188,6 @@ class RootRedirectView(View):
         return redirect("login")
 
 # core/views.py
-import json
-import logging
-from django.http import JsonResponse
-from django.views.decorators.csrf import csrf_exempt
 
 logger = logging.getLogger(__name__)
 
