@@ -1,0 +1,106 @@
+{% extends "prescription/wizard/base_ai_wizard.html" %}
+{% block title %}Prescription — Summary{% endblock %}
+
+{% block step_content %}
+<div class="container-fluid mt-3">
+
+  
+  <!-- Decision Cards -->
+  <div class="row g-3">
+
+    <!-- History -->
+    <div class="col-md-6">
+      <div class="card h-100">
+        <div class="card-header d-flex justify-content-between">
+          <strong>History</strong>
+          <a href="{% url 'prescription:ai_rx_history' draft.id %}"
+             class="btn btn-sm btn-outline-secondary">Edit</a>
+        </div>
+        <div class="card-body small">
+          {{ history|default:"—" }}
+        </div>
+      </div>
+    </div>
+
+    <!-- Symptoms -->
+    <div class="col-md-6">
+      <div class="card h-100">
+        <div class="card-header d-flex justify-content-between">
+          <strong>Symptoms</strong>
+          <a href="{% url 'prescription:ai_rx_symptoms' draft.id %}"
+             class="btn btn-sm btn-outline-secondary">Edit</a>
+        </div>
+        <div class="card-body small">
+          {{ symptoms|default:"—" }}
+        </div>
+      </div>
+    </div>
+
+    <!-- Findings -->
+    <div class="col-md-6">
+      <div class="card h-100">
+        <div class="card-header d-flex justify-content-between">
+          <strong>Findings</strong>
+          <a href="{% url 'prescription:ai_rx_findings' draft.id %}"
+             class="btn btn-sm btn-outline-secondary">Edit</a>
+        </div>
+        <div class="card-body small">
+          {{ findings|default:"—" }}
+        </div>
+      </div>
+    </div>
+
+    <!-- Diagnosis -->
+    <div class="col-md-6">
+      <div class="card h-100">
+        <div class="card-header d-flex justify-content-between">
+          <strong>Assessment / Diagnosis</strong>
+          <a href="{% url 'prescription:ai_rx_diagnosis' draft.id %}"
+             class="btn btn-sm btn-outline-primary">Edit</a>
+        </div>
+        <div class="card-body">
+          {{ diagnosis|default:"_" }}
+        </div>
+      </div>
+    </div>
+
+    <!-- Medications -->
+    <div class="col-md-12">
+      <div class="card h-100">
+        <div class="card-header d-flex justify-content-between">
+          <strong>Medications</strong>
+          <a href="{% url 'prescription:ai_rx_medications' draft.id %}"
+             class="btn btn-sm btn-outline-primary">Edit</a>
+        </div>
+        <div class="card-body">
+          {% if drugs %}
+            <ul class="list-unstyled mb-0">
+              {% for d in drugs %}
+                <li>
+                  <strong>{{ d.drug_name }}</strong>
+                  {% if d.dosage %} — {{ d.dosage }}{% endif %}
+                  {% if d.frequency %} {{ d.frequency }}{% endif %}
+                  {% if d.duration %} × {{ d.duration }}{% endif %}
+
+                </li>
+              {% endfor %}
+            </ul>
+          {% else %}
+            <span class="text-muted">No medications added</span>
+          {% endif %}
+        </div>
+      </div>
+    </div>
+
+  </div>
+
+  <!-- Final Actions -->
+  <div class="mt-4 d-flex justify-content-end gap-2">
+    <a href="{% url 'prescription:ai_rx_review' draft.id %}"
+       class="btn btn-primary btn-lg">
+      Review before finalizing
+    </a>
+  </div>
+
+</div>
+{% endblock %}

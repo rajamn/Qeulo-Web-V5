@@ -1,0 +1,279 @@
+{% extends "prescription/wizard/base_ai_wizard.html" %}
+{% block title %}History — AI Prescription{% endblock %}
+
+{% block step_title %}{% endblock %}
+
+{% block step_subtitle %}{% endblock %}
+
+{% block step_content %}
+<div class="d-flex justify-content-end mb-2">
+    <span class="text-muted small fw-semibold">
+        History
+    </span>
+</div>
+<!-- <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/tom-select/dist/css/tom-select.bootstrap5.css"> -->
+<style>.ts-control .item {
+    background-color: #eef5ff;
+    border-radius: 12px;
+    padding: 2px 8px;
+    margin-right: 4px;
+}
+.history-chip {
+  background: #e7f1ff;
+  border: 1px solid #cfe2ff;
+  color: #084298;
+  padding: 4px 10px;
+  border-radius: 16px;
+  font-size: 0.8rem;
+  display: inline-flex;
+  align-items: center;
+  cursor: pointer;                 /* 🔑 */
+  user-select: none;               /* 🔑 */
+}
+.history-chip:hover {
+  background: #dbeafe;             /* 🔑 */
+  border-color: #93c5fd;
+}
+.history-chip-row {
+  display: none;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+
+/* visible only when active */
+.history-chip-row.active {
+  display: flex;
+}
+
+.history-chip button {
+  border: none;
+  background: transparent;
+  margin-left: 6px;
+  font-size: 0.9em;
+  cursor: pointer;
+}
+</style>
+
+<form method="post" novalidate>
+  {% csrf_token %}
+
+  
+  <!-- Always show the card -->
+    <div class="card mb-3 shadow-sm">
+        <div class="card-header bg-light"
+             data-bs-toggle="collapse"
+             data-bs-target="#pastHistoryCard"
+             style="cursor:pointer;">
+            <strong>📜 Previous Prescriptions</strong>
+            <small class="float-end text-muted">Click to expand</small>
+            <span class="float-end small text-muted">
+                (Last {{ past_prescriptions|length }})
+            </span>
+        </div>
+
+        <div id="pastHistoryCard" class="collapse">
+            <div class="card-body">
+
+                {% if past_prescriptions %}
+                    {% for p in past_prescriptions %}
+                    <div class="border-bottom pb-2 mb-2">
+                        <strong>{{ p.prescribed_on|date:"d M Y" }}</strong><br>
+
+                        <span class="text-primary">
+                            {{ p.diagnosis|default:"No diagnosis recorded" }}
+                        </span><br>
+
+                        {% if p.notes_findings %}
+                            <small class="text-muted">
+                                {{ p.notes_findings|truncatewords:20 }}
+                            </small><br>
+                        {% endif %}
+
+                        <strong>Medications:</strong>
+                        <ul class="small mb-1">
+                            {% for d in p.details.all %}
+                                <li>{{ d.drug_name }} — {{ d.dosage }} — {{ d.duration }}</li>
+                            {% endfor %}
+                        </ul>
+
+                        <button class="btn btn-sm btn-outline-primary copy-meds-btn"
+                                data-rx="{{ p.id }}">
+                            Copy Medicines →
+                        </button>
+
+                        <a href="{% url 'prescription:ai_prescription_print_builder' p.id %}" 
+                           target="_blank"
+                           class="small">
+                           View full →
+                        </a>
+                    </div>
+                    {% endfor %}
+
+                {% else %}
+                    <p class="text-muted small mb-0">
+                        No previous prescriptions found for this patient.
+                    </p>
+                {% endif %}
+                
+
+            </div>
+        </div>
+    </div>
+    <!-- End Card -->
+  <div class="mb-3">
+  
+  <!-- Standard Structured History Dropdown -->
+  
+  {% if draft.data.carried.history %}
+    <div class="alert bg-light border p-3 mb-3">
+      <strong>Previous History:</strong>
+      <pre class="small">{{ draft.data.carried.history }}</pre>
+      <button type="button"
+              class="btn btn-sm btn-outline-primary"
+              onclick="copyToTextarea('id_history', `{{ draft.data.carried.history|escapejs }}`)">
+          Copy History →
+      </button>
+    </div>
+    {% endif %}
+
+  
+  <textarea
+    id="id_history"
+    name="history"
+    class="form-control"
+    rows="8"
+    placeholder="Click a phrase to insert into notes">{{ history }}</textarea>
+
+<div id="history-chip-panel" class="history-chip-row mt-2">
+  {% for phrase in history_phrases %}
+    <span class="history-chip" data-value="{{ phrase.text }}">
+      {{ phrase.text }}
+    </span>
+  {% endfor %}
+  </div>
+</div>
+
+  <div class="d-flex justify-content-between mt-3">
+   <a href="{% url 'prescription:ai_rx_decision' draft.id %}" class="btn btn-outline-secondary">
+          ← Back to Summary
+    </a>
+
+  </div>
+  </form>
+<div class="modal fade" id="addHistoryTemplateModal" tabindex="-1">
+  <div class="modal-dialog">
+    <div class="modal-content">
+
+      <form method="post" action="{% url 'prescription:add_history_template' draft.id %}">
+        {% csrf_token %}
+
+        <div class="modal-header">
+          <h5 class="modal-title">Add Custom History Template</h5>
+          <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+        </div>
+
+        <div class="modal-body">
+
+          <label class="form-label">Template Name</label>
+          <input type="text" name="label" class="form-control" required>
+          <input type="hidden" name="history_structured" id="id_history_structured">
+          <label class="form-label mt-3">Content</label>
+          <textarea name="content" class="form-control" rows="4" required></textarea>
+
+        </div>
+
+        <div class="modal-footer">
+          <button type="submit" class="btn btn-primary">Save Template</button>
+        </div>
+        <script>
+        function copyToTextarea(textareaId, content) {
+            const textarea = document.getElementById(textareaId);
+            if (!textarea) return;
+
+            if (textarea.value.trim()) {
+                textarea.value += "\n\n" + content.trim();
+            } else {
+                textarea.value = content.trim();
+            }
+            textarea.focus();
+        }
+        </script>
+      </form>
+    </div>
+  </div>
+</div>
+
+<script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/js/bootstrap.bundle.min.js"
+          integrity="sha384-C6RzsynM9kWDrMNeT87bh95OGNyZPhcTNXj1NW7RuBCsyN/o0jlpcV8Q0zS8d0qK"
+          crossorigin="anonymous"></script>
+
+  
+  <script>
+  
+  document.addEventListener("DOMContentLoaded", function() {
+
+    const textarea = document.getElementById("id_history");
+
+    document.querySelectorAll(".history-chip").forEach(chip => {
+      chip.addEventListener("mousedown", () => {
+        textarea.focus();   // 🔑 force focus first
+        const text = chip.dataset.value;
+        insertAtCursor(text.endsWith(".") ? text : text + ".");
+      });
+    });
+
+    // Section helpers
+    function insertAtCursor(text) {
+    const start = textarea.selectionStart ?? textarea.value.length;
+    const end = textarea.selectionEnd ?? textarea.value.length;
+
+    const prefix =
+      start > 0 && !textarea.value.slice(start - 1, start).match(/\s/)
+        ? " "
+        : "";
+
+    textarea.value =
+      textarea.value.substring(0, start) +
+      prefix +
+      text +
+      textarea.value.substring(end);
+
+    const newPos = start + prefix.length + text.length;
+    textarea.selectionStart = textarea.selectionEnd = newPos;
+
+    textarea.dispatchEvent(new Event("input", { bubbles: true }));
+    textarea.focus();
+  }
+
+
+});
+document.addEventListener("DOMContentLoaded", function () {
+    Autosave.init();
+});
+document.getElementById("id_history")
+  .addEventListener("input", e => {
+      Autosave.save("history", e.target.value);
+  });
+
+document.addEventListener("DOMContentLoaded", function () {
+  const textarea = document.getElementById("id_history");
+  const chipPanel = document.getElementById("history-chip-panel");
+
+  if (!textarea || !chipPanel) return;
+
+  textarea.addEventListener("focus", () => {
+    chipPanel.classList.add("active");
+  });
+
+  textarea.addEventListener("blur", () => {
+  setTimeout(() => {
+    if (!document.activeElement.classList.contains("history-chip")) {
+      chipPanel.classList.remove("active");
+    }
+  }, 100);
+});
+});
+</script>
+
+
+{% endblock %}

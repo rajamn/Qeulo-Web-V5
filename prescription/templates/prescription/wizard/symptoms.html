@@ -1,0 +1,252 @@
+{% extends "prescription/wizard/base_ai_wizard.html" %}
+{% block title %}Symptoms — AI Prescription{% endblock %}
+
+{% block step_title %}{% endblock %}
+{% block step_subtitle %}{% endblock %}
+
+{% block step_content %}
+<div class="d-flex justify-content-end mb-2">
+    <span class="text-muted small fw-semibold">
+        Symptoms
+    </span>
+</div>
+<style>
+.ts-dropdown-sm {
+  max-height: 220px;
+  overflow-y: auto;
+}
+.ts-control .item {
+    background-color: #eef5ff;
+    border-radius: 12px;
+    padding: 2px 8px;
+    margin-right: 4px;
+}
+.symptoms-chip {
+  background: #e7f1ff;
+  border: 1px solid #cfe2ff;
+  color: #084298;
+  padding: 4px 10px;
+  border-radius: 16px;
+  font-size: 0.8rem;
+  display: inline-flex;
+  align-items: center;
+  cursor: pointer;                 /* 🔑 */
+  user-select: none;               /* 🔑 */
+}
+.symptoms-chip:hover {
+  background: #dbeafe;             /* 🔑 */
+  border-color: #93c5fd;
+}
+.symptoms-chip-row {
+  display: none;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+
+/* visible only when active */
+.symptoms-chip-row.active {
+  display: flex;
+}
+
+.symptoms-chip button {
+  border: none;
+  background: transparent;
+  margin-left: 6px;
+  font-size: 0.9em;
+  cursor: pointer;
+}
+</style>
+
+<form method="post" novalidate>
+    {% csrf_token %}
+
+    
+        <div style="width:35%" class="mb-2">
+            <select id="std-symptoms-select"
+                    multiple
+                    placeholder="Search symptoms…"
+                    autocomplete="off">
+                {% for group, items in std_symptoms.items %}
+                    <optgroup label="{{ group }}">
+                        {% for item in items %}
+                            <option value="{{ item }}">{{ item }}</option>
+                        {% endfor %}
+                    </optgroup>
+                {% endfor %}
+            </select>
+        </div>
+
+        {% if draft.data.carried.notes_symptoms %}
+            <div class="alert bg-light border p-3 mb-3">
+            <strong>Previous Symptoms:</strong>
+            <pre class="small">{{ draft.data.carried.notes_symptoms }}</pre>
+
+            <button type="button"
+                    class="btn btn-sm btn-outline-primary"
+                    onclick="copyToTextarea('id_symptoms', `{{ draft.data.carried.notes_symptoms|escapejs }}`)">
+                Copy Symptoms →
+            </button>
+            </div>
+        {% endif %}
+
+
+        <label for="id_symptoms" class="form-label fw-semibold mt-3">Symptoms Notes</label>
+        <div id="symptoms-chip-panel"
+            class="symptoms-chip-row mt-2">
+            {% for s in quick_symptoms %}
+                <span class="symptoms-chip"
+                    data-value="{{ s }}">
+                    {{ s }}
+                </span>
+            {% endfor %}
+
+        </div>
+
+        <textarea
+        id="id_symptoms"
+        name="symptoms"
+        class="form-control"
+        rows="8"
+        placeholder="Click a phrase to insert into notes">{{ symptoms }}</textarea>
+
+
+    </div>
+
+    <div class="d-flex justify-content-between mt-3">
+        <a href="{% url 'prescription:ai_rx_decision' draft.id %}" class="btn btn-outline-secondary">
+          ← Back to Summary
+        </a>
+
+    </div>
+</form>
+
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/tom-select/dist/css/tom-select.bootstrap5.min.css">
+
+<script src="https://cdn.jsdelivr.net/npm/tom-select/dist/js/tom-select.complete.min.js"></script>
+
+<script>
+document.addEventListener("DOMContentLoaded", function () {
+
+    const textarea = document.getElementById("id_symptoms");
+    if (!textarea) return;
+
+
+    function appendLine(text) {
+    if (!text) return;
+
+    // prevent duplicates (line-based, safe)
+    const lines = textarea.value.split("\n").map(l => l.trim());
+    if (lines.includes(text)) return;
+
+    textarea.value = textarea.value
+      ? textarea.value.trimEnd() + "\n" + text
+      : text;
+    textarea.dispatchEvent(new Event("input", { bubbles: true }));
+    textarea.focus();
+  }
+
+  const ts = new TomSelect("#std-symptoms-select", {
+    plugins: ["remove_button"],
+    persist: false,
+    maxItems: null,
+    closeAfterSelect: false,   // 🔑 IMPORTANT
+    openOnFocus: true,
+
+    onItemAdd(value) {
+      appendLine(value + ".");
+    },
+
+    onItemRemove(value) {
+      // optional: do nothing (do NOT delete from textarea)
+    }
+  });
+
+    function alreadyPresent(word) {
+        const regex = new RegExp(`\\b${word.replace('.', '')}\\b`, 'i');
+        return regex.test(textarea.value);
+    }
+
+    function copyToTextarea(id, text) {
+        const el = document.getElementById(id);
+        if (!el) return;
+
+        el.value = text;
+        el.dispatchEvent(new Event("input", { bubbles: true }));
+        el.focus();
+    }
+
+    function insertAtCursor(text) {
+      if (alreadyPresent(text)) return;
+
+      const start = textarea.selectionStart ?? textarea.value.length;
+      const end = textarea.selectionEnd ?? textarea.value.length;
+
+      const prefix =
+        start > 0 && !textarea.value.slice(start - 1, start).match(/\s/)
+          ? " "
+          : "";
+
+      textarea.value =
+        textarea.value.substring(0, start) +
+        prefix +
+        text +
+        textarea.value.substring(end);
+
+      const newPos = start + prefix.length + text.length;
+      textarea.selectionStart = textarea.selectionEnd = newPos;
+
+      textarea.dispatchEvent(new Event("input", { bubbles: true }));
+      textarea.focus();
+  }
+
+
+    /* ✅ Quick chips */
+    document.querySelectorAll(".symptoms-chip").forEach(chip => {
+      chip.addEventListener("mousedown", (e) => {
+          e.preventDefault();        // 🔑 stop blur
+          textarea.focus();          // 🔑 restore focus
+
+          insertAtCursor(chip.dataset.value + ".");
+      });
+  });
+
+
+});
+
+
+document.addEventListener("DOMContentLoaded", function () {
+
+    const textarea = document.getElementById("id_symptoms");
+    if (!textarea) return;
+
+    Autosave.init();
+
+    textarea.addEventListener("input", function (e) {
+        Autosave.save("symptoms", e.target.value);
+    });
+
+});
+document.addEventListener("DOMContentLoaded", function () {
+  const textarea = document.getElementById("id_symptoms");
+  const chipPanel = document.getElementById("symptoms-chip-panel");
+
+  if (!textarea || !chipPanel) return;
+
+  textarea.addEventListener("focus", () => {
+    chipPanel.classList.add("active");
+  });
+
+  textarea.addEventListener("blur", () => {
+  setTimeout(() => {
+    if (!document.activeElement.classList.contains("symptoms-chip")) {
+      chipPanel.classList.remove("active");
+    }
+  }, 100);
+});
+
+});
+
+
+</script>
+
+{% endblock %}

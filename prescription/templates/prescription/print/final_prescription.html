@@ -155,8 +155,28 @@
 <body>
 
 <!-- HEADER -->
-<div class="header">
-    <h2>{{ master.hospital.name }}</h2>
+<div class="no-print"
+     style="margin-top:8px; display:flex; gap:10px; justify-content:center;">
+
+    <button type="button"
+            onclick="window.history.back()"
+            style="padding:6px 14px;
+                   border:1px solid #0a4d8c;
+                   border-radius:6px;
+                   background:#fff;
+                   color:#0a4d8c;
+                   cursor:pointer;">
+        ← Back
+    </button>
+
+    <button onclick="window.print()"
+            style="padding:6px 16px; font-weight:600;">
+        🖨 Print
+    </button>
+
+</div>
+
+
     <div class="sub-heading">
         {{ master.hospital.address }}<br>
         Phone: {{ master.hospital.mobile }} | Email: {{ master.hospital.email }}
@@ -237,6 +257,7 @@
                 <th>Frequency</th>
                 <th>Duration</th>
                 <th>Food</th>
+                <th>Instructions</th>
             </tr>
         </thead>
 
@@ -245,12 +266,23 @@
         <tr class="drug-row">
             <td>
                 <strong>{{ d.drug_name }}</strong><br>
-                {% if d.composition %}<small>{{ d.composition }}</small>{% endif %}
+
+                {% if d.composition %}
+                    <small>{{ d.composition }}</small><br>
+                {% endif %}
+
+                {% if d.instructions %}
+                    <div style="margin-top:4px; font-size:12px; color:#333;">
+                        <em>Instructions:</em> {{ d.instructions|linebreaksbr }}
+                    </div>
+                {% endif %}
             </td>
+
             <td>{{ d.dosage }}</td>
             <td>{{ d.frequency }}</td>
             <td>{{ d.duration }}</td>
             <td>{{ d.food_order }}</td>
+            <td style="font-size:12px;">{{ d.instructions|default:"—" }}</td>
         </tr>
         {% endfor %}
         </tbody>
@@ -298,7 +330,6 @@
     </button>
 
 </div>
-
-
 </body>
+
 </html>

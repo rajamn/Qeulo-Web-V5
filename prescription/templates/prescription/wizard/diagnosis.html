@@ -1,0 +1,199 @@
+{% extends "prescription/wizard/base_ai_wizard.html" %}
+{% block title %}{% endblock %}
+
+{% block step_title %}
+<div class="d-flex justify-content-between align-items-center">
+  <button type="button"
+          class="btn btn-sm btn-outline-primary p-1 px-2"
+          data-bs-toggle="modal"
+          data-bs-target="#investigationsModal"
+          title="Investigations & Vitals">
+      📑
+  </button>
+</div>
+{% endblock %}
+{% block step_subtitle %}{% endblock %}
+
+{% block step_content %}
+<style>
+/* Tabs */
+.diagnosis-tabs .btn {
+  border-radius: 20px;
+  font-size: 0.75rem;
+}
+
+/* Panels */
+.diagnosis-panel {
+  display: none;
+  flex-wrap: wrap;
+  gap: 6px;
+  margin-top: 6px;
+}
+
+.diagnosis-panel.active {
+  display: flex;
+}
+
+/* Chips */
+.chip {
+  background: #e7f1ff;
+  border: 1px solid #cfe2ff;
+  color: #084298;
+  padding: 4px 10px;
+  border-radius: 16px;
+  font-size: 0.75rem;
+  cursor: pointer;
+  user-select: none;
+}
+
+.chip:hover {
+  background: #dbeafe;
+  border-color: #93c5fd;
+}
+</style>
+
+<div class="d-flex justify-content-end mb-2">
+    <span class="text-muted small fw-semibold">
+        Provisional Diagnosis
+    </span>
+</div>
+<form method="post" novalidate>
+  {% csrf_token %}
+
+<textarea
+      id="id_diagnosis"
+      name="diagnosis"
+      class="form-control"
+      rows="5"
+      placeholder="E.g. Acute viral febrile illness — ?Dengue / ?Enteric fever...">{{ diagnosis|default_if_none:"" }}</textarea>
+{% if carried_diagnosis %}
+    <div class="alert bg-light border p-3 mb-3">
+      <strong>Previous Diagnosis:</strong>
+      <pre class="small">{{ draft.data.carried.diagnosis }}</pre>
+
+      <button type="button"
+              class="btn btn-sm btn-outline-primary"
+              onclick="copyToTextarea('id_diagnosis', `{{ draft.data.carried.diagnosis|escapejs }}`)">
+          Copy Diagnosis →
+      </button>
+    </div>
+  {% endif %}
+
+  <div class="mb-3">
+    {% if diagnosis_phrases %}
+
+<!-- ===== Diagnosis Tabs ===== -->
+<div class="btn-group btn-group-sm diagnosis-tabs mb-2" role="group">
+    {% for section in diagnosis_phrases.keys %}
+      
+        <button type="button"
+                  class="btn btn-outline-secondary diagnosis-tab {% if forloop.first %}active{% endif %}"
+                  data-target="fx-{{ forloop.counter }}">
+          {{ section }}
+          </button>
+    {% endfor %}
+  </div>
+
+<!-- ===== Diagnosis Tab Content ===== -->
+  {% for section, phrases in diagnosis_phrases.items %}
+    <div id="fx-{{ forloop.counter }}"
+        class="diagnosis-panel {% if forloop.first %}active{% endif %}">
+        {% for p in phrases %}
+        <span class="chip"
+                onclick="insertDiagnosis(`{{ p|escapejs }}`)">
+            {{ p }}
+        </span>
+        {% endfor %}
+    </div>
+  {% endfor %}
+
+</div>
+{% endif %}
+
+    <div class="form-text">
+      You can enter differentials here as well, if you prefer.
+    </div>
+  </div>
+
+  <div class="d-flex justify-content-between mt-3">
+    <!-- <a href="{% url 'prescription:ai_rx_decision' draft.id %}" class="btn btn-outline-secondary">
+      ← Back to Summary
+    </a> -->
+    <button type="submit" class="btn-outline-secondary">←Back to Summary</button>
+
+</div>
+
+</form>
+
+<script>
+document.addEventListener("DOMContentLoaded", function () {
+
+  const textarea = document.getElementById("id_diagnosis");
+  const backBtn = document.querySelector(".js-back-summary");
+
+    if (backBtn && window.Autosave) {
+      backBtn.addEventListener("click", function (e) {
+        e.preventDefault(); // 🔑 stop navigation
+
+        backBtn.classList.add("disabled");
+        backBtn.textContent = "Saving…";
+
+        // 🔑 force final save
+        Autosave.save("diagnosis", textarea.value);
+
+        Autosave.flush()
+          .then(() => {
+            window.location.href = backBtn.href;
+          })
+          .catch(() => {
+            backBtn.classList.remove("disabled");
+            backBtn.textContent = "← Back to Summary";
+            alert("Unable to save diagnosis. Please try again.");
+          });
+      });
+    }
+
+
+  /* -------- insert Diagnosis -------- */
+  window.insertDiagnosis = function (text) {
+    if (!textarea || textarea.value.includes(text)) return;
+    textarea.value = textarea.value
+      ? textarea.value.trim() + "\n" + text
+      : text;
+    textarea.dispatchEvent(new Event("input", { bubbles: true }));
+    textarea.focus();
+  };
+
+  /* -------- tabs -------- */
+  document.querySelectorAll(".diagnosis-tab").forEach(tab => {
+    tab.addEventListener("click", () => {
+      document.querySelectorAll(".diagnosis-tab").forEach(t => t.classList.remove("active"));
+      document.querySelectorAll(".diagnosis-panel").forEach(p => p.classList.remove("active"));
+
+      tab.classList.add("active");
+      const panel = document.getElementById(tab.dataset.target);
+      if (panel) panel.classList.add("active");
+    });
+  });
+
+  /* -------- autosave -------- */
+  document.addEventListener("DOMContentLoaded", function () {
+
+    const textarea = document.getElementById("id_diagnosis");
+    if (!textarea) return;
+
+  Autosave.init();
+
+  textarea.addEventListener("input", function (e) {
+        Autosave.save("diagnosis", e.target.value);
+  });
+
+});
+
+
+});
+</script>
+
+
+
+{% endblock %}

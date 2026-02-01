@@ -1,0 +1,349 @@
+{% extends "prescription/wizard/base_ai_wizard.html" %}
+{% block title %}{% endblock %}
+
+{% block step_title %} 
+<button type="button"
+          class="btn btn-sm btn-outline-primary p-1 px-2"
+          data-bs-toggle="modal"
+          data-bs-target="#investigationsModal"
+          title="Investigations & Vitals">
+      📑
+  </button>
+</div>
+{% endblock %}
+
+{% block step_subtitle %}{% endblock %}
+
+{% block step_content %}
+<style>
+/* Tabs */
+.findings-tabs .btn {
+  border-radius: 20px;
+  font-size: 0.75rem;
+}
+
+/* Panels */
+.findings-panel {
+  display: none;
+  flex-wrap: wrap;
+  gap: 6px;
+  margin-top: 6px;
+}
+
+.findings-panel.active {
+  display: flex;
+}
+
+/* Chips */
+.chip {
+  background: #e7f1ff;
+  border: 1px solid #cfe2ff;
+  color: #084298;
+  padding: 4px 10px;
+  border-radius: 16px;
+  font-size: 0.75rem;
+  cursor: pointer;
+  user-select: none;
+}
+
+.chip:hover {
+  background: #dbeafe;
+  border-color: #93c5fd;
+}
+</style>
+
+<div class="d-flex justify-content-end mb-2">
+    <span class="text-muted small fw-semibold">
+        Clinical Findings
+    </span> </div>
+<form method="post" novalidate>
+  {% csrf_token %}
+
+  {% if draft.data.carried.notes_findings %}
+    <div class="alert bg-light border p-3 mb-3">
+      <strong>Previous Findings:</strong>
+      <pre class="small">{{ draft.data.carried.notes_findings }}</pre>
+
+      <button type="button"
+              class="btn btn-sm btn-outline-primary"
+              onclick="copyToTextarea('id_findings', `{{ draft.data.carried.notes_findings|escapejs }}`)">
+          Copy Findings →
+      </button>
+    </div>
+  {% endif %}
+  
+
+        <div class="mb-3">
+            <!-- eb<label for="id_findings" class="form-label fw-semibold">Clinical Assessment</label> -->
+
+            <textarea id="id_findings" name="findings" class="form-control"
+                    rows="8"
+                    placeholder="E.g. BP 130/80, PR 96/min, Temp 101°F, no pallor, RS clear...">{{ findings }}</textarea>
+        </div>
+    <!-- FINDINGS TABS -->
+    <div class="btn-group btn-group-sm findings-tabs mb-2" role="group">
+    {% for section in findings_phrases.keys %}
+        <button type="button"
+                class="btn btn-outline-secondary findings-tab {% if forloop.first %}active{% endif %}"
+                data-target="fx-{{ forloop.counter }}">
+        {{ section }}
+        </button>
+    {% endfor %}
+    </div>
+
+    <!-- FINDINGS PANELS -->
+    {% for section, phrases in findings_phrases.items %}
+    <div id="fx-{{ forloop.counter }}"
+        class="findings-panel {% if forloop.first %}active{% endif %}">
+        {% for p in phrases %}
+        <span class="chip"
+                onclick="insertFinding(`{{ p|escapejs }}`)">
+            {{ p }}
+        </span>
+        {% endfor %}
+    </div>
+    {% endfor %}
+   
+
+  <div class="d-flex justify-content-between mt-3">
+    <!-- <a href="{% url 'prescription:ai_rx_decision' draft.id %}" class="btn btn-outline-secondary js-back-summary">
+      ← Back to Summary
+    </a> -->
+
+    <!-- <button type="submit" class="btn btn-primary">Save Findings</button> -->
+    <button type="submit" class="btn-outline-secondary">←Back to Summary</button>
+ </div>
+</form>
+
+<!-- ===================================================== -->
+<!--  Investigations Modal (Vitals + Reports)               -->
+<!-- ===================================================== -->
+
+<div class="modal fade" id="investigationsModal" tabindex="-1">
+  <div class="modal-dialog modal-lg modal-dialog-scrollable">
+    <div class="modal-content">
+
+      <div class="modal-header">
+        <h5 class="modal-title">Investigations & Vitals</h5>
+        <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+      </div>
+
+      <div class="modal-body">
+
+        <!-- ------------------ -->
+        <!-- VITALS SECTION      -->
+        <!-- ------------------ -->
+        <h5 class="mb-2">Vitals</h5>
+
+        {% if latest_vitals %}
+        <div class="card p-3 mb-4 bg-light border">
+
+            <div class="row text-center mb-2">
+                <div class="col-4">
+                    <small class="text-muted d-block">Height</small>
+                    <strong>{{ latest_vitals.height_cm }} cm</strong>
+                </div>
+
+                <div class="col-4">
+                    <small class="text-muted d-block">Weight</small>
+                    <strong>{{ latest_vitals.weight_kg }} kg</strong><br>
+                    <small class="text-muted">BMI {{ latest_vitals.bmi }}</small>
+                </div>
+
+                <div class="col-4">
+                    <small class="text-muted d-block">Temp</small>
+                    <strong>{{ latest_vitals.temperature_c }} °C</strong>
+                </div>
+            </div>
+
+            <hr class="my-2">
+
+            <div class="row text-center">
+                <div class="col-4">
+                    <small class="text-muted d-block">Blood Pressure</small>
+                    <strong>{{ latest_vitals.bp_systolic }}/{{ latest_vitals.bp_diastolic }}</strong>
+                </div>
+
+                <div class="col-4">
+                    <small class="text-muted d-block">Pulse</small>
+                    <strong>{{ latest_vitals.pulse_bpm|default:"—" }} bpm</strong>
+                </div>
+
+                <div class="col-4">
+                    <small class="text-muted d-block">SpO₂</small>
+                    <strong>{{ latest_vitals.spo2_percent }}%</strong>
+                </div>
+            </div>
+
+            <div class="text-end mt-3">
+                <button type="button" class="btn btn-sm btn-outline-primary" id="insertVitalsBtn">
+                    Insert Vitals →
+                </button>
+            </div>
+
+        </div>
+
+        {% else %}
+        <p class="text-muted">No vitals recorded.</p>
+        <button type="button" class="btn btn-sm btn-outline-secondary mb-4" id="insertVitalsTemplateBtn">
+            Insert Vitals Template →
+        </button>
+        {% endif %}
+
+        <!-- ------------------ -->
+        <!-- REPORTS SECTION    -->
+        <!-- ------------------ -->
+
+        <h5 class="mt-4 mb-2">Investigation Reports</h5>
+
+        {% if visit_docs %}
+          {% for doc in visit_docs %}
+          <div class="border-bottom pb-3 mb-3">
+
+            <strong>{{ doc.get_doc_type_display }}</strong>
+            <span class="text-muted small"> · {{ doc.created_at|date:"d M Y" }}</span>
+
+            {% if doc.description %}
+            <div class="small mt-1">{{ doc.description }}</div>
+            {% endif %}
+
+            <div class="mt-2">
+                {% if doc.file %}
+                <a class="btn btn-sm btn-outline-primary" href="{{ doc.file.url }}"
+                   target="_blank">View File →</a>
+                {% endif %}
+            </div>
+
+            <!-- AI Summary -->
+            {% if doc.ai_summary_data %}
+            <details class="mt-2">
+                <summary class="fw-bold text-success">
+                    <i class="bi bi-robot"></i> AI Summary
+                </summary>
+
+                <div class="p-2 bg-light border rounded small mt-2">
+                    {% if doc.ai_summary_data.impression %}
+                    <p><strong>Impression:</strong> {{ doc.ai_summary_data.impression }}</p>
+                    {% endif %}
+
+                    {% if doc.ai_summary_data.key_findings %}
+                    <strong>Key Findings:</strong>
+                    <ul>
+                      {% for line in doc.ai_summary_data.key_findings.splitlines %}
+                        {% if line %}<li>{{ line }}</li>{% endif %}
+                      {% endfor %}
+                    </ul>
+                    {% endif %}
+
+                    {% if doc.ai_summary_data.recommendations %}
+                    <strong>Recommendations:</strong>
+                    <ul>
+                      {% for line in doc.ai_summary_data.recommendations.splitlines %}
+                        {% if line %}<li>{{ line }}</li>{% endif %}
+                      {% endfor %}
+                    </ul>
+                    {% endif %}
+                </div>
+            </details>
+            {% endif %}
+
+            {% if doc.ocr_text %}
+            <details class="mt-2">
+                <summary class="text-primary fw-semibold">
+                    <i class="bi bi-search"></i> OCR Extracted Text
+                </summary>
+
+                <pre class="small mt-2 p-2 bg-light border rounded"
+                     style="white-space: pre-wrap; max-height: 250px; overflow-y:auto;">{{ doc.ocr_text }}</pre>
+            </details>
+            {% endif %}
+
+          </div>
+          {% endfor %}
+        {% else %}
+          <p class="text-muted">No investigation reports found.</p>
+        {% endif %}
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- ===================================================== -->
+<!--  JS                                                   -->
+<!-- ===================================================== -->
+
+<script>
+const VITALS_TEXT = `{{ vitals_block|escapejs }}`;
+</script>
+
+<script>
+document.addEventListener("DOMContentLoaded", function () {
+
+  const textarea = document.getElementById("id_findings");
+  const backBtn = document.querySelector(".js-back-summary");
+
+    if (backBtn && window.Autosave) {
+      backBtn.addEventListener("click", function (e) {
+        e.preventDefault(); // 🔑 stop navigation
+
+        backBtn.classList.add("disabled");
+        backBtn.textContent = "Saving…";
+
+        // 🔑 force final save
+        Autosave.save("findings", textarea.value);
+
+        Autosave.flush()
+          .then(() => {
+            window.location.href = backBtn.href;
+          })
+          .catch(() => {
+            backBtn.classList.remove("disabled");
+            backBtn.textContent = "← Back to Summary";
+            alert("Unable to save findings. Please try again.");
+          });
+      });
+    }
+
+
+  /* -------- insert finding -------- */
+  window.insertFinding = function (text) {
+    if (!textarea || textarea.value.includes(text)) return;
+    textarea.value = textarea.value
+      ? textarea.value.trim() + "\n" + text
+      : text;
+    textarea.dispatchEvent(new Event("input", { bubbles: true }));
+    textarea.focus();
+  };
+
+  /* -------- tabs -------- */
+  document.querySelectorAll(".findings-tab").forEach(tab => {
+    tab.addEventListener("click", () => {
+      document.querySelectorAll(".findings-tab").forEach(t => t.classList.remove("active"));
+      document.querySelectorAll(".findings-panel").forEach(p => p.classList.remove("active"));
+
+      tab.classList.add("active");
+      const panel = document.getElementById(tab.dataset.target);
+      if (panel) panel.classList.add("active");
+    });
+  });
+
+  /* -------- autosave -------- */
+  document.addEventListener("DOMContentLoaded", function () {
+
+    const textarea = document.getElementById("id_findings");
+    if (!textarea) return;
+
+  Autosave.init();
+
+  textarea.addEventListener("input", function (e) {
+        Autosave.save("findings", e.target.value);
+  });
+
+});
+
+
+});
+</script>
+
+
+{% endblock %}

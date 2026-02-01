@@ -1,0 +1,270 @@
+{% extends "base_sidebar.html" %}
+{% block title %}AI Prescription Wizard{% endblock %}
+
+{% block content %}
+
+<style>
+@media (min-width: 992px) {
+  .ai-left-panel {
+    position: sticky;
+    top: 80px;
+    max-height: calc(100vh - 100px);
+    overflow-y: auto;
+  }
+}
+@media (max-width: 991px) {
+  .ai-left-panel {
+    position: static !important;
+    max-height: none !important;
+  }
+}
+</style>
+
+
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/tom-select/dist/css/tom-select.bootstrap5.css">
+<script src="https://cdn.jsdelivr.net/npm/tom-select/dist/js/tom-select.complete.min.js"></script>
+
+
+<div class="container-fluid py-3">
+  <!-- Autosave -->
+  <div id="autosave-status"
+            class="small text-muted"
+            style="position: fixed; top: 64px; right: 20px; z-index: 1050;">
+          Saved ✓
+  </div>
+
+  <!-- A + B + C + D : CONTEXT STRIP -->
+  <div class="card shadow-sm mb-3">
+    <div class="card-body">
+
+    
+    
+    <hr class="my-2">
+    {% if not is_edit_mode %}
+    <!-- B + C : Queue -->
+    <div class="row g-2 mb-2">
+    
+      <div class="col-6">
+        <a class="fw-semibold small d-flex justify-content-between text-decoration-none"
+          data-bs-toggle="collapse"
+          href="#dw-in-queue"
+          role="button"
+          aria-expanded="true">
+          <span class="d-inline-flex align-items-center gap-1">
+            <span>In Queue</span>
+            <span class="text-muted">({{ doctor_ctx.stats.in_queue }})</span>
+          </span>
+        </a>
+
+        <div class="collapse show mt-2" id="dw-in-queue">
+          {% for appt in doctor_ctx.in_queue %}
+            <div class="small">
+              {{ appt.patient.patient_name }} · {{ appt.patient.age_years }}y
+            </div>
+          {% empty %}
+            <div class="small text-muted">No patients waiting</div>
+          {% endfor %}
+        </div>
+      </div>
+
+      <!-- COMPLETED -->
+      <div class="col-6">
+        <a class="fw-semibold small d-flex justify-content-between text-decoration-none"
+          data-bs-toggle="collapse"
+          href="#dw-completed"
+          role="button"
+          aria-expanded="false">
+          <span class="d-inline-flex align-items-center gap-1">
+            <span>Completed</span>
+            <span class="text-muted">({{ doctor_ctx.stats.completed }})</span>
+          </span>
+
+        </a>
+
+        <div class="collapse mt-2" id="dw-completed">
+          {% for appt in doctor_ctx.completed %}
+            <div class="small text-muted">
+              {{ appt.patient.patient_name }} · {{ appt.patient.age_years }}y
+            </div>
+          {% empty %}
+            <div class="small text-muted">None completed yet</div>
+          {% endfor %}
+        </div>
+      </div>
+    </div>
+
+    <hr class="my-2">
+    {% endif %}
+  
+    <!-- D. Visit Summary -->
+        
+  <a class="fw-semibold small d-flex justify-content-between text-decoration-none"
+       data-bs-toggle="collapse"
+       href="#dw-summary">
+      <span>🧾 Visit Summary</span>
+      <span class="text-muted">Show / Hide</span>
+    </a>
+
+    <div class="collapse show mt-2" id="dw-summary">
+      <div class="d-flex flex-wrap gap-2">
+        <span class="badge rounded-pill {% if draft.data.history %}bg-success{% else %}bg-secondary{% endif %}">
+              1. History
+            </span>
+
+            <span class="badge rounded-pill {% if draft.data.symptoms %}bg-success{% else %}bg-secondary{% endif %}">
+              2. Symptoms
+            </span>
+
+            <span class="badge rounded-pill {% if draft.data.findings %}bg-success{% else %}bg-secondary{% endif %}">
+              3. Findings
+            </span>
+
+            <span class="badge rounded-pill {% if draft.data.diagnosis %}bg-success{% else %}bg-secondary{% endif %}">
+              4. Diagnosis
+            </span>
+
+            <span class="badge rounded-pill {% if draft.data.ai_notes %}bg-info{% else %}bg-secondary{% endif %}">
+              5. AI Suggestions
+            </span>
+
+            <span class="badge rounded-pill {% if draft.data.drugs %}bg-info{% else %}bg-secondary{% endif %}">
+              6. Prescription
+            </span>
+      </div>
+    </div>
+
+  </div>
+</div>
+
+<!-- A. Patient -->
+    {% if patient %}
+      <div class="mb-2">
+        <a class="fw-semibold small d-flex justify-content-between text-decoration-none"
+          data-bs-toggle="collapse"
+          href="#dw-patient"
+          role="button"
+          aria-expanded="true">
+          <span>👤 Patient</span>
+          <span class="text-muted">Details</span>
+        </a>
+
+        <div class="collapse show mt-2" id="dw-patient">
+          <div class="d-flex align-items-center p-2 bg-light rounded">
+            <strong class="me-3">{{ patient.patient_name }}</strong>
+            <span class="text-muted me-3">{{ patient.age_years }}y {{ patient.age_months }}m</span>
+            <span class="text-muted me-3">{{ patient.get_gender_display }}</span>
+            {% if patient.contact.mobile_num %}
+              <span class="text-muted">{{ patient.contact.mobile_num }}</span>
+            {% endif %}
+            <span class="badge bg-primary-subtle text-primary border ms-auto">
+              Draft #{{ draft.id }}
+            </span>
+          </div>
+        </div>
+      </div>
+    {% endif %}
+  <!-- DW FULL WIDTH -->
+  <div class="row">
+    <div class="col-12">
+
+      <h4 class="mb-0">{% block step_title %}{% endblock %}</h4>
+      <div class="text-muted small mb-3">
+        {% block step_subtitle %}{% endblock %}
+      </div>
+
+      <div class="card shadow-sm">
+        <div class="card-body">
+          {% block step_content %}{% endblock %}
+        </div>
+      </div>
+
+    </div>
+  </div>
+
+</div>
+
+
+<script>
+function copyToTextarea(textareaId, content) {
+    const textarea = document.getElementById(textareaId);
+    if (!textarea) return;
+
+    if (textarea.value.trim()) {
+        textarea.value += "\n\n" + content.trim();
+    } else {
+        textarea.value = content.trim();
+    }
+    textarea.focus();
+}
+const Autosave = (function () {
+    let timer = null;
+    let stateEl = null;
+
+    function init() {
+        stateEl = document.getElementById("autosave-status");
+        setSaved();
+    }
+
+    function setSaving() {
+        if (stateEl) {
+            stateEl.textContent = "Saving…";
+            stateEl.className = "small text-warning";
+        }
+    }
+
+    function setSaved() {
+        if (stateEl) {
+            stateEl.textContent = "Saved ✓";
+            stateEl.className = "small text-success";
+        }
+    }
+
+    function setError() {
+        if (stateEl) {
+            stateEl.textContent = "Save failed ⚠";
+            stateEl.className = "small text-danger";
+        }
+    }
+
+    function save(field, value, delay = 400) {
+        if (!field) return;
+
+        if (timer) clearTimeout(timer);
+
+        setSaving();
+
+        timer = setTimeout(() => {
+            fetch("{% url 'prescription:ai_rx_autosave' draft.id %}", {
+                method: "POST",
+                headers: {
+                    "X-CSRFToken": "{{ csrf_token }}",
+                    "Content-Type": "application/x-www-form-urlencoded"
+                },
+                body: new URLSearchParams({
+                    field: field,
+                    value: value
+                })
+            })
+            .then(r => r.json())
+            .then(data => {
+                if (data.status === "ok") {
+                    setSaved();
+                } else {
+                    setError();
+                }
+            })
+            .catch(() => {
+                setError();
+            });
+        }, delay);
+    }
+
+    return {
+        init,
+        save
+    };
+})();
+</script>
+
+
+{% endblock %}
