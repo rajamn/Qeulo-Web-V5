@@ -1,6 +1,7 @@
 from django.db import models
 from core.models import Hospital
 from django.core.validators import RegexValidator
+from .constants import DOCTOR_SPECIALTIES
 from datetime import time
 
 mobile_validator = RegexValidator(regex=r'^\d{10}$', message="Enter a valid 10-digit mobile number")
@@ -35,7 +36,17 @@ class Doctor(models.Model):
     # Managers
     objects = ActiveDoctorManager()      # Default → only active doctors
     all_objects = models.Manager()       # Escape hatch → includes inactive
+    primary_specialty = models.CharField(
+        max_length=32,
+        choices=DOCTOR_SPECIALTIES,
+        default="general"
+    )
 
+    secondary_specialties = models.JSONField(
+        blank=True,
+        null=True,
+        default=list
+    )
     class Meta:
         indexes = [
             models.Index(fields=['hospital']),

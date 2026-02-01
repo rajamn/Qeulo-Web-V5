@@ -12,6 +12,7 @@ from core.models import HospitalUser
 from doctors.models import Doctor
 from django.db.models import OuterRef, Subquery, Case, When, IntegerField
 from core.decorators import doctor_required,hospital_admin_required
+from doctors.utils import get_doctor_sidebar_ctx
 
 @doctor_required
 def doctor_dashboard(request):
@@ -79,6 +80,7 @@ def doctor_dashboard(request):
             "appointments": appointments,
             "recent_rx": recent_rx,
             "stats": stats,
+            "sidebar_ctx" : get_doctor_sidebar_ctx(request.user),
         }
     )
 
