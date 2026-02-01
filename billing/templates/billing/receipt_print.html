@@ -105,7 +105,7 @@
     </div>
 
     <div class="meta">
-      <strong>Date:</strong>
+      <strong>Date:{{ payment.paid_on|date:"d-m-Y"|default:"-" }}</strong>
       {% if payment and payment.paid_on %}{{ payment.paid_on|date:"d-m-Y" }}{% else %}{{ now|date:"d-m-Y" }}{% endif %}
       &#160;&#160;&#160; <strong>Receipt No:</strong> {{ receipt_no }}
     </div>
