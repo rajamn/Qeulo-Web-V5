@@ -472,7 +472,14 @@ def cash_receipt_pdf(request, appointment_id):
     if total is None:
         total = sum((Decimal(getattr(t, "amount", 0) or 0) for t in txns), Decimal("0.00"))
 
-    receipt_no = f"RCP-{appt.hospital_id}-{date.today():%Y%m%d}-{appt.pk}"
+    appointment_date = appt.appointment_on
+
+    today = date.today()
+
+    # Receipt date should be appointment date or today, whichever is earlier
+    payment = appt.payment
+    receipt_date = payment.paid_on if payment and payment.paid_on else None
+    receipt_no = f"RCP-{appt.hospital_id}-{receipt_date:%Y%m%d}-{appt.pk}"
 
     # --- Patient details (DOB-based)
     patient = appt.patient
@@ -500,7 +507,7 @@ def cash_receipt_pdf(request, appointment_id):
         "orientation": orientation,
         "page_class": page_class,
         "for_pdf": True,
-        "now": datetime.now(),
+        "receipt_date": receipt_date,
         "receipt_no": receipt_no,
 
         # Consultation policy info
@@ -557,8 +564,16 @@ def cash_receipt_preview(request, appointment_id):
         total = sum((Decimal(getattr(t, "amount", 0)) for t in txns), Decimal("0.00"))
 
     # Generate a stable receipt number
-    receipt_no = f"RCP-{appt.hospital_id}-{date.today():%Y%m%d}-{appt.pk}"
+    
 
+    appointment_date = appt.appointment_on
+    today = date.today()
+
+    # Receipt date should be appointment date or today, whichever is earlier
+    payment = appt.payment
+
+    receipt_date = payment.paid_on if payment and payment.paid_on else None
+    receipt_no = f"RCP-{appt.hospital_id}-{receipt_date:%Y%m%d}-{appt.pk}"
     # Extract patient details (DOB-based)
     patient = appt.patient
     gender = dict(Patient.GENDER_CHOICES).get(patient.gender, patient.gender)
@@ -576,7 +591,7 @@ def cash_receipt_preview(request, appointment_id):
         "hospital": appt.hospital,
         "patient": patient,
         "doctor": appt.doctor,
-        "payment": payment,
+        "payment": appt.payment,
         "txns": txns,
         "amount": total,
         "total_amount": total,
@@ -585,7 +600,7 @@ def cash_receipt_preview(request, appointment_id):
         "pagesize": pagesize,
         "orientation": orientation,
         "for_pdf": False,
-        "now": date.today(),
+        "receipt_date": receipt_date,
         "receipt_no": receipt_no,
         # 🧾 Display values
         "age_display": age_str,
@@ -880,7 +895,13 @@ def combined_receipt_token_pdf(request, appointment_id):
     if total is None:
         total = sum((Decimal(getattr(t, "amount", 0) or 0) for t in txns), Decimal("0.00"))
 
-    receipt_no = f"RCP-{appt.hospital_id}-{date.today():%Y%m%d}-{appt.pk}"
+    appointment_date = appt.appointment_on
+    today = date.today()
+
+    # Receipt date should be appointment date or today, whichever is earlier
+    payment = appt.payment
+    receipt_date = payment.paid_on if payment and payment.paid_on else None
+    receipt_no = f"RCP-{appt.hospital_id}-{receipt_date:%Y%m%d}-{appt.pk}"
 
     # --- Page setup (with safe defaults)
     pagesize = (request.GET.get("pagesize", "A5") or "A5").upper()
@@ -909,6 +930,7 @@ def combined_receipt_token_pdf(request, appointment_id):
         "total_amount": total,
         "amount_in_words": _amount_in_words_inr(Decimal(total or 0)),
         "receipt_no": receipt_no,
+        "receipt_date": receipt_date,
         "consult_message": policy.get("message", ""),
 
         # layout
@@ -927,12 +949,6 @@ def combined_receipt_token_pdf(request, appointment_id):
     return resp
 
 
-
-from django.http import JsonResponse
-from django.contrib.auth.decorators import login_required
-from datetime import date
-from .models import Patient
-from django.db.models import Q
 
 #patients/view.py
 

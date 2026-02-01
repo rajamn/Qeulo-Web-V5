@@ -107,7 +107,7 @@
       {% if hospital.email %}{% if hospital.phone_num %} | {% endif %}Email: {{ hospital.email }}{% endif %}
     </div>
     <div class="meta">
-      <strong>Date:</strong> {{ payment.paid_on|date:"d-m-Y"|default:now|date:"d-m-Y" }}
+      <strong>Date:</strong>{{ payment.paid_on|date:"d-m-Y"|default:"-" }}
       &#160;&#160;&#160; <strong>Receipt No:</strong> {{ receipt_no|default:"-" }}
     </div>
   </div>

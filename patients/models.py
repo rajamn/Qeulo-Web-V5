@@ -2,6 +2,8 @@ from datetime import date
 from django.db import models
 from core.models import Hospital
 
+
+#patients/models.py
 GENDER_CHOICES = [
     ('M', 'Male'),
     ('F', 'Female'),
@@ -21,7 +23,7 @@ class Contact(models.Model):
     def __str__(self):
         return f"{self.contact_name} ({self.mobile_num})"
 
-
+#patients/models.py
 class Patient(models.Model):
     contact = models.ForeignKey(Contact, on_delete=models.CASCADE, related_name="patients")
     patient_name = models.CharField(max_length=255)
